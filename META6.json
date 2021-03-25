@@ -1,0 +1,20 @@
+{
+  "auth" : "cpan:LEONT",
+  "authors" : [
+    "Leon Timmermans"
+  ],
+  "build-depends" : [ ],
+  "depends" : [ ],
+  "description" : "blah blah blah",
+  "license" : "Artistic-2.0",
+  "name" : "Protocol::MQTT",
+  "perl" : "6.d",
+  "provides" : {
+    "Protocol::MQTT" : "lib/Protocol/MQTT.rakumod"
+  },
+  "resources" : [ ],
+  "source-url" : "",
+  "tags" : [ ],
+  "test-depends" : [ ],
+  "version" : "0.0.1"
+}
