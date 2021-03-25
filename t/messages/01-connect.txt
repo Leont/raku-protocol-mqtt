@@ -1,0 +1,5 @@
+Protocol::MQTT::Message::Connect.new(:client-identifier<mosquitto_sub_10888>, :keep-alive-interval(60));
+
+10 1f 00 04  4d 51 54 54    04 02  00 3c 00 13
+6d 6f 73 71  75 69 74 74    6f 5f 73 75  62 5f 31 30
+38 38 38

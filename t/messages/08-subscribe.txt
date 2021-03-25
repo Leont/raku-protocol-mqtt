@@ -1,0 +1,9 @@
+Protocol::MQTT::Message::Subscribe.new(
+	:packet-id(1)
+	:subscriptions[Protocol::MQTT::Subscription.new(
+		:topic<testing>,
+		:qos(Protocol::MQTT::Qos::At-most-once),
+	)],
+);
+
+82 0c 00 01  00 07 74 65    73 74 69 6e  67 00

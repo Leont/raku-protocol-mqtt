@@ -1,0 +1,69 @@
+#! raku
+
+use v6.d;
+
+use Test;
+use fatal;
+
+use Protocol::MQTT;
+
+my $dir = 't/messages'.IO;
+for $dir.dir.sort -> $filename {
+	if $filename ~~ / ^ .* '/' (<-[/]>+) \.txt $ / -> ($name) {
+		subtest $name, {
+			my ($args-str, $packet) = $filename.slurp.split("\n\n");
+
+			$packet ~~ s:g/ \s+ //;
+			if deserialize($packet) -> $received {
+				is(to-hex($received.encode), $packet, $name ~ ' - packet bytes');
+
+				my $evaled = do {
+					use MONKEY-SEE-NO-EVAL;
+					EVAL $args-str;
+				}
+				is-deeply($received, $evaled, 'Message as expected');
+			}
+			else {
+				flunk 'Could not decode';
+			}
+			CATCH { when Protocol::MQTT::DecodeError {
+				flunk 'Got a decoding exception: ' ~ $_.message;
+			}}
+		}
+	}
+}
+
+done-testing;
+
+sub deserialize(Str $encoded) {
+	my $buffer = Protocol::MQTT::PacketBuffer.new;
+	$buffer.add-data(from-hex($encoded));
+	return $buffer.get-packet;
+}
+
+sub from-hex(Str $hex is copy) {
+	my buf8 $buf = buf8.new;
+
+	my int $chars = $hex.chars;
+	if $chars % 2 {
+		$hex   = $hex ~ '0';
+		$chars = $chars + 1;
+	}
+	loop (my $i = 0; $i < $chars; $i += 2) {
+		my $doublet = substr($hex, $i, 2);
+		$buf.push(:16($doublet));
+	}
+
+	return $buf;
+}
+
+sub to-hex(buf8 $buffer) {
+	my Str $result = '';
+
+	for ^$buffer.elems -> $pos {
+		my int $byte = $buffer[$pos];
+		$result ~= ($byte +> 4).fmt("%x") ~ ($byte % 16).fmt("%x");
+	}
+	return $result;
+}
+
