@@ -1,0 +1,147 @@
+#! raku
+use v6;
+use Test;
+use Protocol::MQTT :types;
+
+sub far(Str $topic) {
+	return Filter.new(:$topic);
+}
+
+# Boring spec tests, the "non normative comments" from the MQTT 3.1.1 draft
+
+subtest 'Section 4.7.1.2', {
+	my ($match, $filter, $topic);
+
+	$match = far($filter = "sport/tennis/player1/#");
+
+	$topic = 'sport/tennis/player1';
+	cmp-ok($topic, '~~', $match, "4.7.1.2, '$topic' should match '$filter'");
+
+	$topic = 'sport/tennis/player1/ranking';
+	cmp-ok($topic, '~~', $match, "4.7.1.2, '$topic' should match '$filter'");
+
+	$topic = 'sport/tennis/player1/wimbledon';
+	cmp-ok($topic, '~~', $match, "4.7.1.2, '$topic' should match '$filter'");
+
+	$match = far($filter = 'sport/#');
+
+	$topic = 'sport';
+	cmp-ok($topic, '~~', $match, "4.7.1.2, '$topic' should match '$filter'");
+}
+
+subtest 'Section 4.7.1.3', {
+	my ($match, $filter, $topic);
+
+	$match = far($filter = "sport/tennis/+");
+
+	$topic = 'sport/tennis/player1';
+	cmp-ok($topic, '~~', $match, "4.7.1.3, '$topic' should match '$filter'");
+
+	$topic = 'sport/tennis/player2';
+	cmp-ok($topic, '~~', $match, "4.7.1.3, '$topic' should match '$filter'");
+
+	$topic = 'sport/tennis/player1/ranking';
+	cmp-ok($topic, '!~~', $match, "4.7.1.3, '$topic' should not match '$filter'");
+
+	$match = far($filter = 'sport/+');
+
+	$topic = 'sport';
+	cmp-ok($topic, '!~~', $match, "4.7.1.3, '$topic' should not match '$filter'");
+
+	$topic = 'sport/';
+	cmp-ok($topic, '~~', $match, "4.7.1.3, '$topic' should match '$filter'");
+}
+
+subtest 'Section 4.7.2.1', {
+	my ($match, $filter, $topic);
+
+	$match = far($filter = '#');
+	$topic = '$SYS/something';
+	cmp-ok($topic, '!~~', $match, "4.7.2.1, '$topic' should not match '$filter'");
+
+	$match = far($filter = "+/monitor/Clients");
+	$topic = '$SYS/monitor/Clients';
+	cmp-ok($topic, '!~~', $match, "4.7.2.1, '$topic' should not match '$filter'");
+
+	$match = far($filter = '$SYS/#');
+	$topic = "\$SYS/something";
+	cmp-ok($topic, '~~', $match, "4.7.2.1, '$topic' should match '$filter'");
+
+	$match = far($filter = '$SYS/monitor/+');
+	$topic = '$SYS/monitor/Clients';
+	cmp-ok($topic, '~~', $match, "4.7.2.1, '$topic' should match '$filter'");
+}
+
+# Now, let's try a more systematic approach
+
+my @match = (
+	# Topic             Should match all of these, but none of the
+	#                   other ones that are listed for other topics.
+	'/'             => <# /# +/+ />,
+	'foo'           => <# +   foo/# foo>,
+	'foo/bar'       => <# +/+ foo/# foo/bar/# foo/+ +/bar foo/+/#>,
+	'foo//bar'      => <# +/+/+ foo/# foo//bar foo/+/bar foo/+/# foo//+>,
+	'/foo'          => <# /# +/+ /foo /foo/#>,
+	'/$foo'         => <# /# +/+ /$foo /$foo/#>,  # Not special
+	'/foo/bar'      => <# /# +/+/+ /foo/#>,
+	'///'           => <# /# +/+/+/+>,
+	'foo/bar/baz'   => <# +/+/+ foo/# foo/bar/# foo/+/#
+	                    +/bar/baz foo/+/baz foo/bar/+ +/+/baz>,
+	'$foo'          => <$foo $foo/#>,  # Special because it begins with $
+	'$SYS/foo'      => <$SYS/# $SYS/+ $SYS/foo>,
+	'$SYS/foo/bar'  => <$SYS/# $SYS/+/+ $SYS/foo/bar $SYS/+/bar $SYS/foo/+>,
+	'fo2/bar/baz'   => <# fo2/bar/baz +/+/+ +/+/baz +/bar/baz>,
+	'foo///baz'     => <# foo/# foo/+/# foo/+/+/baz +/+/+/+>,
+	'foo/bar/'      => <# foo/# foo/+/# foo/bar/+ foo/bar/# +/+/+>,
+);
+
+my @all-filters = @match.map(*.value).flat.unique.sort;
+
+for @match -> (:key($topic), :value(@should-match)) {
+	say "# Topic $topic";
+	subtest "Topic $topic", {
+		my @should-not-match = @all-filters.grep: none @should-match;
+
+		for @should-match -> $filter {
+			my $match = far($filter);
+			cmp-ok($topic, '~~', $match, "'$topic' should match '$filter'");
+		}
+
+		for @should-not-match -> $filter {
+			my $match = far($filter);
+			cmp-ok($topic, '!~~', $match, "'$topic' should not match '$filter'");
+		}
+	}
+}
+
+subtest 'mosquitto', {
+	# These are from mosquitto's 03-pattern-matching.py
+	pattern-test("test/topic", "#");
+	pattern-test("/test/topic", "#");
+	pattern-test("foo/bar/baz", "foo/#");
+	pattern-test("foo/bar/baz", "foo/+/baz");
+	pattern-test("foo/bar/baz", "foo/+/baz/#");
+	pattern-test("foo/bar/baz/bar", "foo/+/baz/#");
+	pattern-test("foo/foo/baz/bar", "foo/foo/baz/#");
+	pattern-test("foo", "foo/#");
+	pattern-test("/foo", "/#");
+	pattern-test("test/topic/", "test/topic/");
+	pattern-test("test/topic/", "test/topic/+");
+	pattern-test("one/two/three/four/five/six/seven/eight/nine/ten/test", "+/+/+/+/+/+/+/+/+/+/test");
+	pattern-test("test////a//topic", "#");
+	pattern-test("/test////a//topic", "#");
+	pattern-test("foo//bar///baz", "foo/#");
+	pattern-test("foo//baz", "foo/+/baz");
+	pattern-test("foo//baz//", "foo/+/baz//");
+	pattern-test("foo//baz", "foo/+/baz/#");
+	pattern-test("foo//baz/bar", "foo/+/baz/#");
+	pattern-test("foo//baz/bar", "foo//baz/#");
+	pattern-test("foo/foo/baz/bar", "foo/foo/baz/#");
+	pattern-test("////foo///bar", "/#");
+
+	sub pattern-test(Str $match, Str $pattern) is hidden-from-backtrace {
+		cmp-ok($match, '~~', far($pattern), "mosquitto: '$match' should match '$pattern'");
+	}
+}
+
+done-testing;
