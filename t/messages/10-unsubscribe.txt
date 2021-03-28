@@ -1,4 +1,4 @@
-Message::Unsubscribe.new(
+Packet::Unsubscribe.new(
 	:1packet-id,
 	:subscriptions[ 'testing' ],
 )

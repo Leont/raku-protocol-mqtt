@@ -3,24 +3,24 @@ use v6.d;
 unit package Protocol::MQTT:ver<0.0.1>:auth<cpan:LEONT>;
 
 use Protocol::MQTT::Error;
+use Protocol::MQTT::Packet :decoder;
 use Protocol::MQTT::Qos :qos;
-use Protocol::MQTT::Message :decoder;
 
 my %class-for-type = (
-	0x1 => Message::Connect,
-	0x2 => Message::ConnAck,
-	0x3 => Message::Publish,
-	0x4 => Message::PubAck,
-	0x5 => Message::PubRec,
-	0x6 => Message::PubRel,
-	0x7 => Message::PubComp,
-	0x8 => Message::Subscribe,
-	0x9 => Message::SubAck,
-	0xa => Message::Unsubscribe,
-	0xb => Message::UnsubAck,
-	0xc => Message::PingReq,
-	0xd => Message::PingResp,
-	0xe => Message::Disconnect,
+	0x1 => Packet::Connect,
+	0x2 => Packet::ConnAck,
+	0x3 => Packet::Publish,
+	0x4 => Packet::PubAck,
+	0x5 => Packet::PubRec,
+	0x6 => Packet::PubRel,
+	0x7 => Packet::PubComp,
+	0x8 => Packet::Subscribe,
+	0x9 => Packet::SubAck,
+	0xa => Packet::Unsubscribe,
+	0xb => Packet::UnsubAck,
+	0xc => Packet::PingReq,
+	0xd => Packet::PingResp,
+	0xe => Packet::Disconnect,
 );
 
 our class PacketBuffer is export(:decoder) {
@@ -53,7 +53,7 @@ our class PacketBuffer is export(:decoder) {
 		return $!buffer.elems >= $offset + $remaining;
 	}
 
-	method get-packet(--> Message) {
+	method get-packet(--> Packet) {
 		return Nil if $!buffer.elems < 2;
 
 		my $byte1 = $!buffer.read-uint8(0);

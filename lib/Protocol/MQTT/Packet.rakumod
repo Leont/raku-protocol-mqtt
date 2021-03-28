@@ -168,46 +168,46 @@ my sub pack-flags(*@values) {
 	return $flag;
 }
 
-our role Message[Type $type, Qos $qos = At-most-once] is export(:messages :decoder) {
+our role Packet[Type $type, Qos $qos = At-most-once] is export(:packets :decoder) {
 	method message-type(--> Type) {
 		return $type;
 	}
 	method header-byte(--> Byte) {
 		return pack-flags(False, $qos, False, $type);
 	}
-	method decode-body(Message:U: DecodeBuffer $buffer, Int $flags --> Message:D) {
+	method decode-body(Packet:U: DecodeBuffer $buffer, Int $flags --> Packet:D) {
 		...
 	}
-	method !encode-body(Message:D: EncodeBuffer --> Nil) {
+	method !encode-body(Packet:D: EncodeBuffer --> Nil) {
 		...
 	}
 
-	method encode(Message:D: --> Buf) {
+	method encode(Packet:D: --> Buf) {
 		my $buffer = EncodeBuffer.new;
 		self!encode-body($buffer);
 		return buf8.new(self.header-byte) ~ $buffer.Buf;
 	}
 }
 
-my role Message::Empty {
-	method decode-body(Message:U: DecodeBuffer $, Int $ --> Message) {
+my role Packet::Empty {
+	method decode-body(Packet:U: DecodeBuffer $, Int $ --> Packet) {
 		return self.new;
 	}
-	method !encode-body(Message:D: EncodeBuffer $ --> Nil) {
+	method !encode-body(Packet:D: EncodeBuffer $ --> Nil) {
 	}
 }
 
-my role Message::JustId {
+my role Packet::JustId {
 	has Short:D $.packet-id is required;
-	method decode-body(Message:U: DecodeBuffer $buffer, Int $ --> Message) {
+	method decode-body(Packet:U: DecodeBuffer $buffer, Int $ --> Packet) {
 		return self.new(:packet-id($buffer.decode-short));
 	}
-	method !encode-body(Message:D: EncodeBuffer $buffer) {
+	method !encode-body(Packet:D: EncodeBuffer $buffer) {
 		$buffer.encode-short($!packet-id);
 	}
 }
 
-our class Message::Connect does Message[Type::Connect] is export(:messages) {
+our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 	has Str:D $.protocol-name = 'MQTT';
 	has Byte:D $.protocol-version = 4;
 
@@ -221,7 +221,7 @@ our class Message::Connect does Message[Type::Connect] is export(:messages) {
 	has Str $.username;
 	has Str $.password;
 
-	method decode-body(DecodeBuffer $buffer, Int $  --> Message::Connect) {
+	method decode-body(DecodeBuffer $buffer, Int $  --> Packet::Connect) {
 		my $protocol-name = $buffer.decode-string;
 		my $protocol-version = $buffer.decode-byte;
 
@@ -247,7 +247,7 @@ our class Message::Connect does Message[Type::Connect] is export(:messages) {
 		return self.new(|%args);
 	}
 
-	method !encode-body(Message::Connect:D: EncodeBuffer $buffer) {
+	method !encode-body(Packet::Connect:D: EncodeBuffer $buffer) {
 		$buffer.encode-string($!protocol-name);
 		$buffer.encode-byte($!protocol-version);
 		$buffer.encode-byte(pack-flags(Skip, $!clean-start, ?$!will, $!will ?? $!will.qos !! At-most-once, $!will ?? $!will.retain !! False, $!password.defined, $!username.defined));
@@ -262,7 +262,7 @@ our class Message::Connect does Message[Type::Connect] is export(:messages) {
 	}
 }
 
-our class Message::ConnAck does Message[Type::ConnAck] is export(:messages) {
+our class Packet::ConnAck does Packet[Type::ConnAck] is export(:packets) {
 	our enum ConnectStatus (
 		Accepted                              => 0,
 		Refused-unacceptable-protocol-version => 1,
@@ -279,19 +279,19 @@ our class Message::ConnAck does Message[Type::ConnAck] is export(:messages) {
 		return $!return-code === Accepted;
 	}
 
-	method decode-body(Message::ConnAck:U: DecodeBuffer $buffer, Int $) {
+	method decode-body(Packet::ConnAck:U: DecodeBuffer $buffer, Int $) {
 		my ($session-acknowledge) = $buffer.unpack-byte(Bool);
 		my $return-code = ConnectStatus($buffer.decode-byte) orelse die Error::InvalidValue.new('Invalid connect status');
 		return self.new(:$session-acknowledge, :$return-code);
 	}
 
-	method !encode-body(Message::ConnAck:D: EncodeBuffer $buffer) {
+	method !encode-body(Packet::ConnAck:D: EncodeBuffer $buffer) {
 		$buffer.encode-byte(pack-flags($.session-acknowledge));
 		$buffer.encode-byte(+$.return-code);
 	}
 }
 
-class Message::Publish does Message[Type::Publish] is export(:messages) {
+class Packet::Publish does Packet[Type::Publish] is export(:packets) {
 	has Qos:D $.qos = At-least-once;
 	has Bool:D $.retain = False;
 	has Bool:D $.dup = False;
@@ -305,7 +305,7 @@ class Message::Publish does Message[Type::Publish] is export(:messages) {
 		die Error::Semantic.new('No packet-id on publish with qos') if $!qos > At-most-once && !$!packet-id.defined;
 		die Error::Semantic.new('Can\'t duplicate qos-less message') if $!qos == At-most-once && $!dup;
 	}
-	method decode-body(Message:U: DecodeBuffer $buffer, Int $flags --> Message) {
+	method decode-body(Packet:U: DecodeBuffer $buffer, Int $flags --> Packet) {
 		my ($retain, $qos, $dup) = unpack-flags($flags, Bool, Qos, Bool);
 
 		my $topic = $buffer.decode-string;
@@ -317,26 +317,26 @@ class Message::Publish does Message[Type::Publish] is export(:messages) {
 	method header-byte(--> Byte) {
 		return pack-flags($!retain, $!qos, $!dup, Type::Publish);
 	}
-	method !encode-body(Message:D: EncodeBuffer $buffer --> Nil) {
+	method !encode-body(Packet:D: EncodeBuffer $buffer --> Nil) {
 		$buffer.encode-string($!topic);
 		$buffer.encode-short($!packet-id) if $!qos;
 		$buffer.append-buffer($!message);
 	}
 }
 
-our class Message::PubAck does Message[Type::PubAck] does Message::JustId is export(:messages) {
+our class Packet::PubAck does Packet[Type::PubAck] does Packet::JustId is export(:packets) {
 }
 
-our class Message::PubRec does Message[Type::PubRec] does Message::JustId  is export(:messages) {
+our class Packet::PubRec does Packet[Type::PubRec] does Packet::JustId  is export(:packets) {
 }
 
-our class Message::PubRel does Message[Type::PubRel, At-least-once] does Message::JustId is export(:messages) {
+our class Packet::PubRel does Packet[Type::PubRel, At-least-once] does Packet::JustId is export(:packets) {
 }
 
-our class Message::PubComp does Message[Type::PubComp] does Message::JustId is export(:messages) {
+our class Packet::PubComp does Packet[Type::PubComp] does Packet::JustId is export(:packets) {
 }
 
-our class Message::Subscribe does Message[Type::Subscribe, At-least-once] does Message::JustId is export(:messages) {
+our class Packet::Subscribe does Packet[Type::Subscribe, At-least-once] does Packet::JustId is export(:packets) {
 	class Subscription {
 		has Str:D $.topic is required;
 		has Qos:D $.qos is required;
@@ -346,7 +346,7 @@ our class Message::Subscribe does Message[Type::Subscribe, At-least-once] does M
 	submethod TWEAK() {
 		Error::Semantic.new('Subscribe without subscriptions is invalid') if not @!subscriptions;
 	}
-	method decode-body(Message:U: DecodeBuffer $buffer, Int $) {
+	method decode-body(Packet:U: DecodeBuffer $buffer, Int $) {
 		my $packet-id = $buffer.decode-short;
 		my @subscriptions;
 		while $buffer.has-more {
@@ -356,7 +356,7 @@ our class Message::Subscribe does Message[Type::Subscribe, At-least-once] does M
 		}
 		return self.new(:$packet-id, :@subscriptions);
 	}
-	method !encode-body(Message:D: EncodeBuffer $buffer) {
+	method !encode-body(Packet:D: EncodeBuffer $buffer) {
 		$buffer.encode-short($!packet-id);
 		for @!subscriptions -> $subscription {
 			$buffer.encode-string($subscription.topic);
@@ -365,9 +365,9 @@ our class Message::Subscribe does Message[Type::Subscribe, At-least-once] does M
 	}
 }
 
-our class Message::SubAck does Message[Type::SubAck] does Message::JustId is export(:messages) {
+our class Packet::SubAck does Packet[Type::SubAck] does Packet::JustId is export(:packets) {
 	has Qos:D @.qos-levels;
-	method decode-body(Message:U: DecodeBuffer $buffer, Int $) {
+	method decode-body(Packet:U: DecodeBuffer $buffer, Int $) {
 		my $packet-id = $buffer.decode-short;
 		my @qos-levels;
 		while $buffer.has-more {
@@ -375,7 +375,7 @@ our class Message::SubAck does Message[Type::SubAck] does Message::JustId is exp
 		}
 		return self.new(:$packet-id, :@qos-levels);
 	}
-	method !encode-body(Message:D: EncodeBuffer $buffer) {
+	method !encode-body(Packet:D: EncodeBuffer $buffer) {
 		$buffer.encode-short($!packet-id);
 		for @!qos-levels -> $qos-level {
 			$buffer.encode-byte(+$qos-level);
@@ -383,10 +383,10 @@ our class Message::SubAck does Message[Type::SubAck] does Message::JustId is exp
 	}
 }
 
-our class Message::Unsubscribe does Message[Type::Unsubscribe, At-least-once] does Message::JustId is export(:messages) {
+our class Packet::Unsubscribe does Packet[Type::Unsubscribe, At-least-once] does Packet::JustId is export(:packets) {
 	has Str @.subscriptions;
 
-	method decode-body(Message:U: DecodeBuffer $buffer, Int $) {
+	method decode-body(Packet:U: DecodeBuffer $buffer, Int $) {
 		my $packet-id = $buffer.decode-short;
 		my @subscriptions;
 		while $buffer.has-more {
@@ -394,7 +394,7 @@ our class Message::Unsubscribe does Message[Type::Unsubscribe, At-least-once] do
 		}
 		return self.new(:$packet-id, :@subscriptions);
 	}
-	method !encode-body(Message:D: EncodeBuffer $buffer) {
+	method !encode-body(Packet:D: EncodeBuffer $buffer) {
 		$buffer.encode-short($!packet-id);
 		for @!subscriptions -> $subscription {
 			$buffer.encode-string($subscription);
@@ -402,15 +402,15 @@ our class Message::Unsubscribe does Message[Type::Unsubscribe, At-least-once] do
 	}
 }
 
-our class Message::UnsubAck does Message[Type::UnsubAck] does Message::JustId is export(:messages) {
+our class Packet::UnsubAck does Packet[Type::UnsubAck] does Packet::JustId is export(:packets) {
 }
 
-our class Message::PingReq does Message[Type::PingReq] does Message::Empty is export(:messages) {
+our class Packet::PingReq does Packet[Type::PingReq] does Packet::Empty is export(:packets) {
 }
 
-our class Message::PingResp does Message[Type::PingResp] does Message::Empty is export(:messages) {
+our class Packet::PingResp does Packet[Type::PingResp] does Packet::Empty is export(:packets) {
 }
 
-our class Message::Disconnect does Message[Type::Disconnect] does Message::Empty is export(:messages) {
+our class Packet::Disconnect does Packet[Type::Disconnect] does Packet::Empty is export(:packets) {
 }
 

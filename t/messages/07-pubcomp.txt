@@ -1,3 +1,3 @@
-Message::PubComp.new(:1234packet-id)
+Packet::PubComp.new(:1234packet-id)
 
 70 02 04d2

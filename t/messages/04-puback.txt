@@ -1,3 +1,3 @@
-Message::PubAck.new(:1234packet-id)
+Packet::PubAck.new(:1234packet-id)
 
 40 02 04d2

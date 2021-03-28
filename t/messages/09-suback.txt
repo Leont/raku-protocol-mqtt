@@ -1,4 +1,4 @@
-Message::SubAck.new(
+Packet::SubAck.new(
 	:1packet-id,
 	:qos-levels[ At-most-once ],
 )

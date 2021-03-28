@@ -1,6 +1,6 @@
-Message::Subscribe.new(
+Packet::Subscribe.new(
 	:1packet-id
-	:subscriptions[Message::Subscribe::Subscription.new(
+	:subscriptions[Packet::Subscribe::Subscription.new(
 		:topic<testing>,
 		:qos(At-most-once),
 	)],

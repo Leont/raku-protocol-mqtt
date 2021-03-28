@@ -1,4 +1,4 @@
-Message::Connect.new(
+Packet::Connect.new(
  :client-identifier<mosquitto_sub_10888>,
  :will(Will.new(
 	:topic<topic>,

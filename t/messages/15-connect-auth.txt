@@ -1,4 +1,4 @@
-Message::Connect.new(
+Packet::Connect.new(
  :client-identifier<mosquitto_sub_3926>,
  :username<guest>
  :password<passw0rd>
