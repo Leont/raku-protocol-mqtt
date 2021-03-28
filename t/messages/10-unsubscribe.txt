@@ -1,6 +1,6 @@
 Packet::Unsubscribe.new(
 	:1packet-id,
-	:subscriptions[ 'testing' ],
+	:topic<testing>,
 )
 
 a2 0b 00 01  00 07 74 65    73 74 69 6e  67

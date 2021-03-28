@@ -341,8 +341,15 @@ our class Packet::Subscribe does Packet[Type::Subscribe, At-least-once] does Pac
 		has Str:D $.topic is required;
 		has Qos:D $.qos is required;
 	}
-
 	has Subscription @.subscriptions is required;
+
+	multi method new(Short:D :$packet-id!, Subscription :@subscription!) {
+		self.bless(:$packet-id, :@subscription);
+	}
+	multi method new(Short:D :$packet-id!, Str:D :$topic!, Qos:D :$qos!) {
+		my @subscriptions = Subscription.new(:$topic, :$qos);
+		self.bless(:$packet-id, :@subscriptions);
+	}
 	submethod TWEAK() {
 		Error::Semantic.new('Subscribe without subscriptions is invalid') if not @!subscriptions;
 	}
@@ -386,6 +393,12 @@ our class Packet::SubAck does Packet[Type::SubAck] does Packet::JustId is export
 our class Packet::Unsubscribe does Packet[Type::Unsubscribe, At-least-once] does Packet::JustId is export(:packets) {
 	has Str @.subscriptions;
 
+	multi method new(Short:D :$packet-id!, Str :@subscription!) {
+		self.bless(:$packet-id, :@subscription);
+	}
+	multi method new(Short:D :$packet-id!, Str:D :$topic!) {
+		self.bless(:$packet-id, :subscriptions[ $topic ]);
+	}
 	method decode-body(Packet:U: DecodeBuffer $buffer, Int $) {
 		my $packet-id = $buffer.decode-short;
 		my @subscriptions;
