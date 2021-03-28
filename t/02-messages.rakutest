@@ -5,7 +5,11 @@ use v6.d;
 use Test;
 use fatal;
 
-use Protocol::MQTT;
+use Protocol::MQTT::Error;
+use Protocol::MQTT::Message :messages;
+use Protocol::MQTT::PacketBuffer;
+use Protocol::MQTT::Qos :qos;
+use Protocol::MQTT::Will;
 
 my $dir = 't/messages'.IO;
 for $dir.dir.sort -> $filename {
@@ -26,7 +30,7 @@ for $dir.dir.sort -> $filename {
 			else {
 				flunk 'Could not decode';
 			}
-			CATCH { when Protocol::MQTT::DecodeError {
+			CATCH { when Protocol::MQTT::Error::Decode {
 				flunk 'Got a decoding exception: ' ~ $_.message;
 			}}
 		}

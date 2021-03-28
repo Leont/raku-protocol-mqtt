@@ -1,6 +1,6 @@
 Protocol::MQTT::Message::Subscribe.new(
 	:packet-id(1)
-	:subscriptions[Protocol::MQTT::Subscription.new(
+	:subscriptions[Protocol::MQTT::Message::Subscribe::Subscription.new(
 		:topic<testing>,
 		:qos(Protocol::MQTT::Qos::At-most-once),
 	)],

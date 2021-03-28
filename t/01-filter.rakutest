@@ -1,10 +1,10 @@
 #! raku
 use v6;
 use Test;
-use Protocol::MQTT :types;
+use Protocol::MQTT::Filter;
 
 sub far(Str $topic) {
-	return Filter.new(:$topic);
+	return Protocol::MQTT::Filter.new(:$topic);
 }
 
 # Boring spec tests, the "non normative comments" from the MQTT 3.1.1 draft
