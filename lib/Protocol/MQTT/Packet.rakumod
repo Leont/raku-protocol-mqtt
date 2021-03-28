@@ -82,7 +82,7 @@ our class DecodeBuffer is export(:decoder) {
 		return $result;
 	}
 
-	method decode-buffer(--> Buf) {
+	method decode-blob(--> Buf) {
 		return self!decode-variable-length('buffer');
 	}
 
@@ -234,14 +234,14 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 
 		if $will-flag {
 			my $topic = $buffer.decode-string;
-			my $message = $buffer.decode-buffer;
+			my $message = $buffer.decode-blob;
 			%args<will> = Message.new(:$topic, :$message, :$qos, :$retain);
 		}
 		if $username-flag {
 			%args<username> = $buffer.decode-string;
 		}
 		if $password-flag {
-			%args<password> = $buffer.decode-buffer;
+			%args<password> = $buffer.decode-blob;
 		}
 
 		return self.new(|%args);
