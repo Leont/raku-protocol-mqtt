@@ -3,9 +3,9 @@ use v6.d;
 unit package Protocol::MQTT:ver<0.0.1>:auth<cpan:LEONT>;
 
 use Protocol::MQTT::Error;
+use Protocol::MQTT::Message :message;
 use Protocol::MQTT::Subsets;
 use Protocol::MQTT::Qos :qos;
-use Protocol::MQTT::Will;
 
 my enum Type (
 	Connect     => 0x1,
@@ -216,7 +216,7 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 	has Short:D $.keep-alive-interval = 0;
 	has Str:D $.client-identifier is required;
 
-	has Will $.will;
+	has Message $.will;
 
 	has Str $.username;
 	has Str $.password;
@@ -234,8 +234,8 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 
 		if $will-flag {
 			my $topic = $buffer.decode-string;
-			my $message = $buffer.decode-string;
-			%args<will> = Will.new(:$topic, :$message, :$qos, :$retain);
+			my $message = $buffer.decode-buffer;
+			%args<will> = Message.new(:$topic, :$message, :$qos, :$retain);
 		}
 		if $username-flag {
 			%args<username> = $buffer.decode-string;
@@ -255,7 +255,7 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 		$buffer.encode-string($!client-identifier);
 		with $!will {
 			$buffer.encode-string($!will.topic);
-			$buffer.encode-string($!will.message);
+			$buffer.encode-blob($!will.message);
 		}
 		$buffer.encode-string($!username) with $!username;
 		$buffer.encode-string($!password) with $!password;
