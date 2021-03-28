@@ -1,7 +1,7 @@
 Packet::Connect.new(
  :client-identifier<mosquitto_sub_3926>,
  :username<guest>
- :password<passw0rd>
+ :password(buf8('passw0rd'.encode))
  :60keep-alive-interval,
 )
 

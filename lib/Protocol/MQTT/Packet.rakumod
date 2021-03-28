@@ -219,7 +219,7 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 	has Message $.will;
 
 	has Str $.username;
-	has Str $.password;
+	has Blob $.password;
 
 	method decode-body(DecodeBuffer $buffer, Int $  --> Packet::Connect) {
 		my $protocol-name = $buffer.decode-string;
@@ -241,7 +241,7 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 			%args<username> = $buffer.decode-string;
 		}
 		if $password-flag {
-			%args<password> = $buffer.decode-string;
+			%args<password> = $buffer.decode-buffer;
 		}
 
 		return self.new(|%args);
@@ -258,7 +258,7 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 			$buffer.encode-blob($!will.message);
 		}
 		$buffer.encode-string($!username) with $!username;
-		$buffer.encode-string($!password) with $!password;
+		$buffer.encode-blob($!password) with $!password;
 	}
 }
 
