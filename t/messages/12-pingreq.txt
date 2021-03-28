@@ -1,3 +1,3 @@
-Protocol::MQTT::Message::PingReq.new
+Message::PingReq.new
 
 c0 00

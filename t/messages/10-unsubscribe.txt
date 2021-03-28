@@ -1,5 +1,5 @@
-Protocol::MQTT::Message::Unsubscribe.new(
-	:packet-id(1),
+Message::Unsubscribe.new(
+	:1packet-id,
 	:subscriptions[ 'testing' ],
 )
 

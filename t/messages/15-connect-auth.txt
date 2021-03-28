@@ -1,8 +1,8 @@
-Protocol::MQTT::Message::Connect.new(
+Message::Connect.new(
  :client-identifier<mosquitto_sub_3926>,
  :username<guest>
  :password<passw0rd>
- :keep-alive-interval(60),
+ :60keep-alive-interval,
 )
 
 10 2f 00 04  4d 51 54 54    04 c2  00 3c 00 12

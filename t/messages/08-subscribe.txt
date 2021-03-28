@@ -1,8 +1,8 @@
-Protocol::MQTT::Message::Subscribe.new(
-	:packet-id(1)
-	:subscriptions[Protocol::MQTT::Message::Subscribe::Subscription.new(
+Message::Subscribe.new(
+	:1packet-id
+	:subscriptions[Message::Subscribe::Subscription.new(
 		:topic<testing>,
-		:qos(Protocol::MQTT::Qos::At-most-once),
+		:qos(At-most-once),
 	)],
 );
 

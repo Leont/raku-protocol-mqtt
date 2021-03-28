@@ -1,8 +1,8 @@
-Protocol::MQTT::Message::Publish.new(
- :qos(Protocol::MQTT::Qos::Exactly-once),
+Message::Publish.new(
+ :qos(Exactly-once),
  :topic<testing>,
- :message(buf8(0x74, 0x65, 0x73, 0x74)),
- :packet-id(1),
+ :message(buf8('test'.encode)),
+ :1packet-id,
  :retain,
 )
 

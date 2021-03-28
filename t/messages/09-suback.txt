@@ -1,6 +1,6 @@
-Protocol::MQTT::Message::SubAck.new(
-	:packet-id(1),
-	:qos-levels[ Protocol::MQTT::Qos::At-most-once ],
+Message::SubAck.new(
+	:1packet-id,
+	:qos-levels[ At-most-once ],
 )
 
 90 03 00 01 00

@@ -1,12 +1,12 @@
-Protocol::MQTT::Message::Connect.new(
+Message::Connect.new(
  :client-identifier<mosquitto_sub_10888>,
- :will(Protocol::MQTT::Will.new(
+ :will(Will.new(
 	:topic<topic>,
 	:message<msg>
-	:qos(Protocol::MQTT::Qos::At-least-once),
+	:qos(At-least-once),
 	:retain,
  )),
- :keep-alive-interval(60),
+ :60keep-alive-interval,
 )
 
 10 2b 00 04  4d 51 54 54    04 2e  00 3c 00 13
