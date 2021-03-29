@@ -369,4 +369,13 @@ subtest 'Disconnect', {
 	is-deeply($client2.next-events($now), [ Packet::Disconnect.new ], 'Sending a disconnect');
 }
 
+subtest 'Timeout', {
+	$now++;
+	is($client.state, Connected, 'We are still connected');
+
+	$now += 2 * $keep-alive-interval;
+	is-deeply($client.next-events($now), [], 'No more events');
+	is($client.state, Disconnected, 'We ware now disconnected');
+}
+
 done-testing;

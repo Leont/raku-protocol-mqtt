@@ -25,10 +25,12 @@ has Blob        $.password;
 has Message     $.will;
 has ConnState:D $.state                               = Unconnected;
 has Promise:D   $.connected                           = Promise.new;
+has Promise:D   $.disconnected                        = Promise.new;
 
 has Packet      @!queue;
 has Supplier    $!incoming handles(:incoming<Supply>) = Supplier.new;
-has Instant     $!last-packet;
+has Instant     $!last-packet-received;
+has Instant     $!last-ping-sent;
 has Instant     $.next-expiration;
 has Int         $!packet-order                        = 0;
 
@@ -48,12 +50,15 @@ method !confirm-follow-up(Int:D $packet-id) {
 	}
 }
 
+proto method received-packet(Packet:D, Instant $now) {
+	$!last-packet-received = $now;
+	{*}
+}
 multi method received-packet(Packet::ConnAck:D $packet, Instant $now --> Nil) {
 	if $packet.success {
 		$!state = Connected;
 		$!connected.keep($packet.return-code);
 		if $!keep-alive-interval {
-			$!last-packet = $now;
 			$!next-expiration = $now + $!keep-alive-interval;
 		}
 	}
@@ -98,7 +103,7 @@ multi method received-packet(Packet::SubAck:D (:$packet-id, :$qos-levels), Insta
 multi method received-packet(Packet::UnsubAck:D (:$packet-id), Instant $ --> Nil) {
 	self!confirm-follow-up($packet-id);
 }
-multi method received-packet(Packet:D $packet, Instant $ --> Nil) {
+multi method received-packet(Packet::PingResp:D, Instant $ --> Nil) {
 }
 
 method next-events(Instant:D $now --> List:D) {
@@ -106,10 +111,18 @@ method next-events(Instant:D $now --> List:D) {
 	given $!state {
 		when Unconnected {
 			$!state = Connecting;
+			$!last-ping-sent = $now;
 			$!next-expiration = $now + $!connect-interval;
 			@result.push: Packet::Connect.new(:$!client-identifier, :$!keep-alive-interval, :$!username, :$!password, :$!will);
 		}
 		when Connected {
+			if $!keep-alive-interval && $!last-packet-received + 2 * $!keep-alive-interval < $now {
+				$!state = Disconnected;
+				$!next-expiration = Nil;
+				$!disconnected.break('Timeout');
+				succeed;
+			}
+
 			@result = @!queue.splice;
 
 			my @expirations;
@@ -122,9 +135,11 @@ method next-events(Instant:D $now --> List:D) {
 			}
 
 			if $!keep-alive-interval {
-				@result.push: Packet::PingReq.new if !@result && $!last-packet + $!keep-alive-interval < $now;
-				$!last-packet = $now if @result;
-				@expirations.push: $!last-packet + $!keep-alive-interval;
+				if !@result && $!last-packet-received + $!keep-alive-interval < $now {
+					@result.push: Packet::PingReq.new;
+					$!last-ping-sent = $now;
+				}
+				@expirations.push: ($!last-packet-received max $!last-ping-sent) + $!keep-alive-interval;
 			}
 
 			$!next-expiration = @expirations ?? @expirations.min !! Nil;
