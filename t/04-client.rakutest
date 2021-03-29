@@ -1,0 +1,372 @@
+#! raku
+
+use v6.d;
+
+use Test;
+
+use Protocol::MQTT::Client :state;
+use Protocol::MQTT::Message :message;
+use Protocol::MQTT::Packet :packets;
+use Protocol::MQTT::Qos :qos;
+
+my $client-identifier = 'Test';
+my $keep-alive-interval = 30;
+my $resend-interval = 10;
+my $client = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
+
+my $now = now;
+
+subtest 'Connecting', {
+	is($client.state, Unconnected, 'state=Unconnected');
+	$now++;
+	my @messages = $client.next-events($now);
+	is($client.state, Connecting, 'state=Connecting');
+	is(+@messages, 1, 'Sending one message');
+	is-deeply(@messages[0], Packet::Connect.new(:$client-identifier, :$keep-alive-interval), 'Packet is as expected');
+
+	$client.received-packet(Packet::ConnAck.new, $now + 1);
+	is($client.state, Connected, 'state=Connected');
+}
+
+subtest 'Sending Qos=At-most-once', {
+	$now++;
+	my $promise = $client.publish('foo/bar', 'whatever'.encode, At-most-once, False, $now);
+	ok($promise, 'Promise is immediate');
+	cmp-ok($promise.status, '~~', Kept, 'Promise is kept');
+
+	my @messages = $client.next-events($now);
+	is(+@messages, 1, 'Sending one message');
+
+	is-deeply(@messages[0], Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(At-most-once), :!retain, :!dup), 'Packet is as expected');
+
+	is($client.next-expiration, $now + $keep-alive-interval, 'Next expiration at keep-alive');
+}
+
+subtest 'Sending Qos=At-least-once', {
+	my $packet-id;
+
+	subtest 'Original publish', {
+		$now++;
+		my $promise = $client.publish('foo/bar', 'whatever'.encode, At-least-once, False, $now);
+		ok(!$promise, 'Promise is not immediate');
+
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Sending one message (1)');
+
+		given @messages[0] -> $message {
+			isa-ok($message, Packet::Publish);
+			$packet-id = $message.packet-id;
+			ok($packet-id, 'Packet id is present');
+			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(At-least-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
+		}
+
+		is($client.next-expiration, $now + $resend-interval, 'Next expiration is at resend');
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+		is($client.next-expiration, $now + $resend-interval, 'Next expiration is at resend');
+
+		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
+	}
+
+	subtest 'Resend publish', {
+		$now += $resend-interval + 1;
+
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Got one message (2)');
+		given @messages[0] -> $message {
+			isa-ok($message, Packet::Publish, 'Packet is a publish');
+			is($message.packet-id, $packet-id, 'Packet id has expected value');
+			my $expected = Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(At-least-once), :!retain, :dup, :$packet-id);
+			is-deeply($message, $expected, 'Packet is as expected');
+		}
+
+		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
+		is($client.next-expiration, $now + $resend-interval, 'Next expiration is at resend');
+	}
+
+	subtest 'Receive Acknowledgement', {
+		$now++;
+		$client.received-packet(Packet::PubAck.new(:$packet-id), $now);
+		my @messages3 = $client.next-events($now);
+		is(+@messages3, 0, 'Got no messages');
+
+		is($client.pending-acknowledgements, 0, 'Has 0 pending message');
+	}
+}
+
+subtest 'Sending Qos=Exactly-once', {
+	my $packet-id;
+
+	subtest 'Original publish', {
+		$now++;
+		my $promise = $client.publish('foo/bar', 'whatever'.encode, Exactly-once, False, $now);
+		ok(!$promise, 'Promise is not immediate');
+
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Sending one message');
+
+		given @messages[0] -> $message {
+			isa-ok($message, Packet::Publish);
+			$packet-id = $message.packet-id;
+			ok($packet-id, 'Packet id is present');
+			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(Exactly-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
+		}
+
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+		is($client.next-expiration, $now + $resend-interval, 'Next expiration is at resend');
+
+		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
+	}
+
+	subtest 'Resend publish', {
+		$now += $resend-interval + 1;
+
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Sending one message');
+		given @messages[0] -> $message {
+			isa-ok($message, Packet::Publish, 'Packet is a publish');
+			is($message.packet-id, $packet-id, 'Packet id has expected value');
+			my $expected = Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(Exactly-once), :!retain, :dup, :$packet-id);
+			is-deeply($message, $expected, 'Packet is as expected');
+		}
+
+		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
+	}
+
+	subtest 'Receive record, send release', {
+		$now++;
+		$client.received-packet(Packet::PubRec.new(:$packet-id), $now);
+
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Sending 1 message');
+		is-deeply(@messages[0], Packet::PubRel.new(:$packet-id), 'PubRel is as expected');
+
+		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+	}
+
+	subtest 'Resend release', {
+		$now += $resend-interval + 1;
+
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Sending 1 message');
+		is-deeply(@messages[0], Packet::PubRel.new(:$packet-id), 'PubRel is as expected');
+
+		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+
+		$client.received-packet(Packet::PubComp.new(:$packet-id), $now);
+
+		is($client.pending-acknowledgements, 0, 'Has no pending message');
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+
+		$now += $resend-interval + 1;
+
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+	}
+}
+
+subtest 'Receiving Qos=At-most-once', {
+	$now++;
+	
+	my @all;
+	
+	my $topic = '#';
+	my $qos = At-most-once;
+	my $packet-id;
+
+	my $tap = $client.incoming.tap: -> $message { @all.push($message); }
+	LEAVE { $tap.close };
+
+	subtest 'Sending subscription', {
+		$client.subscribe($topic, $qos, $now);
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Expecting one packet');
+		given @messages[0] -> $message {
+			$packet-id = $message.packet-id;
+			is-deeply($message, Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
+		}
+
+		is-deeply($client.next-events($now), [], 'No events expected');
+	}
+
+	subtest 'Resending subscription', {
+		$now += $resend-interval + 1;
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Expecting one packet');
+		is-deeply(@messages[0], Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
+	}
+
+	subtest 'Subscription acknowledged', {
+		$now++;
+		$client.received-packet(Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
+		
+		$now += $resend-interval + 1;
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+	}
+
+	subtest 'First message', {
+		$now++;
+		$client.received-packet(Packet::Publish.new(:2packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [], 'No events expected');
+
+		is(+@all, 1, 'Received first publish');
+		is-deeply(@all[0], Message.new(:topic<foo>, :message('Hello world'.encode)), 'publish is "Hello world"');
+	}
+
+	subtest 'Second message', {
+		$now++;
+
+		$client.received-packet(Packet::Publish.new(:3packet-id, :topic<foo>, :message('Hello again'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [], 'No events expected');
+
+		is(+@all, 2, 'Received second publish');
+		is-deeply(@all[1], Message.new(:topic<foo>, :message('Hello again'.encode)), 'publish is "Hello again"');
+	}
+}
+
+subtest 'Receiving Qos=At-least-once', {
+	$now++;
+	
+	my @all;
+	
+	my $topic = '#';
+	my $qos = At-least-once;
+	my $packet-id;
+
+	my $tap = $client.incoming.tap: -> $message { @all.push($message); }
+	LEAVE { $tap.close };
+
+	subtest 'Sending subscription', {
+		$client.subscribe($topic, $qos, $now);
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Expecting one packet');
+		given @messages[0] -> $message {
+			$packet-id = $message.packet-id;
+			is-deeply($message, Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
+		}
+
+		is-deeply($client.next-events($now), [], 'No events expected');
+	}
+
+	subtest 'Resending subscription', {
+		$now += $resend-interval + 1;
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Expecting one packet');
+		is-deeply(@messages[0], Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
+	}
+
+	subtest 'Subscription acknowledged', {
+		$now++;
+		$client.received-packet(Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
+
+		$now += $resend-interval + 1;
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+	}
+
+	subtest 'First message', {
+		$now++;
+		$client.received-packet(Packet::Publish.new(:5packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Packet::PubAck.new(:5packet-id) ], 'Packet triggers ack');
+
+		is(+@all, 1, 'Received first publish');
+		is-deeply(@all[0], Message.new(:topic<foo>, :message('Hello world'.encode), :qos(At-least-once)), 'publish is "Hello world"');
+	}
+
+	subtest 'Second message', {
+		$now++;
+
+		$client.received-packet(Packet::Publish.new(:6packet-id, :topic<foo>, :message('Hello again'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Packet::PubAck.new(:6packet-id) ], 'Packet triggers ack');
+
+		is(+@all, 2, 'Received second publish');
+		is-deeply(@all[1], Message.new(:topic<foo>, :message('Hello again'.encode), :qos(At-least-once)), 'publish is "Hello again"');
+	}
+}
+
+subtest 'Receiving Qos=Exactly-once', {
+	$now++;
+	
+	my @all;
+	
+	my $topic = '#';
+	my $qos = Exactly-once;
+	my $packet-id;
+
+	my $tap = $client.incoming.tap: -> $message { @all.push($message); }
+	LEAVE { $tap.close };
+
+	subtest 'Sending subscription', {
+		$client.subscribe($topic, $qos, $now);
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Expecting one packet');
+		given @messages[0] -> $message {
+			$packet-id = $message.packet-id;
+			is-deeply($message, Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
+		}
+
+		is-deeply($client.next-events($now), [], 'No events expected');
+	}
+
+	subtest 'Resending subscription', {
+		$now += $resend-interval + 1;
+		my @messages = $client.next-events($now);
+		is(+@messages, 1, 'Expecting one packet');
+		is-deeply(@messages[0], Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
+	}
+
+	subtest 'Subscription acknowledged', {
+		$now++;
+		$client.received-packet(Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
+
+		$now += $resend-interval + 1;
+		is-deeply($client.next-events($now + 1), [], 'No events expected');
+	}
+
+	subtest 'First message', {
+		$now++;
+		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
+
+		is(+@all, 1, 'Received first publish');
+		is-deeply(@all[0], Message.new(:topic<foo>, :message('Hello world'.encode), :qos(Exactly-once)), 'publish is "Hello world"');
+
+		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
+
+		is(+@all, 1, 'Ignored repeat of publish');
+
+		$client.received-packet(Packet::PubRel.new(:8packet-id), $now);
+		is-deeply($client.next-events($now), [ Packet::PubComp.new(:8packet-id) ], 'Release trigger Complete');
+
+		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :message('Hello world'.encode), :qos(At-most-once)), $now);
+
+		is(+@all, 2, 'After PubComp, packet-id may be used again');
+	}
+
+	subtest 'Second message', {
+		$now++;
+
+		$client.received-packet(Packet::Publish.new(:9packet-id, :topic<foo>, :message('Hello again'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Packet::PubRec.new(:9packet-id) ], 'Packet triggers ack');
+
+		is(+@all, 3, 'Received second publish');
+		is-deeply(@all[2], Message.new(:topic<foo>, :message('Hello again'.encode), :qos(Exactly-once)), 'publish is "Hello again"');
+
+		$client.received-packet(Packet::PubRel.new(:9packet-id), $now);
+		is-deeply($client.next-events($now), [ Packet::PubComp.new(:9packet-id) ], 'Release trigger Complete');
+	}
+}
+
+subtest 'Disconnect', {
+	$now++;
+	my $client2 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
+	$client2.next-events($now);
+	$now++;
+	$client2.received-packet(Packet::ConnAck.new, $now);
+	is($client2.state, Connected, 'We are connected');
+
+	$client2.disconnect;
+	is-deeply($client2.next-events($now), [ Packet::Disconnect.new ], 'Sending a disconnect');
+}
+
+done-testing;
