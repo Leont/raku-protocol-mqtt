@@ -56,19 +56,18 @@ our class PacketBuffer is export(:decoder) {
 	method get-packet(--> Packet) {
 		return Nil if $!buffer.elems < 2;
 
-		my $byte1 = $!buffer.read-uint8(0);
 		my $offset = 1;
 		my $remaining = decode-length($!buffer, $offset) orelse return Nil;
 
 		if $!buffer.elems >= $offset + $remaining {
+			my $packet-type = $!buffer.read-ubits(0, 4);
+			my $flags = $!buffer.read-ubits(4, 4);
 			my $buffer = $!buffer.subbuf($offset, $remaining);
 			$!buffer.=subbuf($offset + $remaining);
 
-			my $packet-type = $byte1 +> 4;
 			die Error::InvalidValue.new('Invalid MQTT type') unless %class-for-type{$packet-type}:exists;
 			my $type = %class-for-type{$packet-type};
 
-			my $flags = $byte1 +& 0xF;
 			my $decoder = DecodeBuffer.new(:$buffer);
 			return $type.decode-body($decoder, $flags);
 		}
