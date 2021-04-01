@@ -115,6 +115,12 @@ method next-events(Instant:D $now --> List:D) {
 			$!next-expiration = $now + $!connect-interval;
 			@result.push: Packet::Connect.new(:$!client-identifier, :$!keep-alive-interval, :$!username, :$!password, :$!will);
 		}
+		when Connecting {
+			if $!next-expiration < $now {
+				$!state = Disconnected;
+				$!disconnected.break('Connect timeout');
+			}
+		}
 		when Connected {
 			if $!keep-alive-interval && $!last-packet-received + 2 * $!keep-alive-interval < $now {
 				$!state = Disconnected;

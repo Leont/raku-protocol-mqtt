@@ -378,4 +378,15 @@ subtest 'Timeout', {
 	is($client.state, Disconnected, 'We ware now disconnected');
 }
 
+subtest 'Connect timeout', {
+	$now++;
+	my $client3 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
+	is($client3.state, Unconnected, 'State starts as unconnected');
+	is-deeply($client3.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
+	is($client3.state, Connecting, 'state is connected after sending connect package');
+	$now += $resend-interval + 1;
+	is-deeply($client3.next-events($now), [], 'Don\'t have packets after connect timeout');
+	is($client3.state, Disconnected, 'Disconnected after connect timeout');
+}
+
 done-testing;
