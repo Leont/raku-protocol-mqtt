@@ -13,7 +13,7 @@ use Getopt::Long;
 class MQTT::Client {
 	has IO::Socket::Async:U $!connection-class;
 	has IO::Socket::Async $!connection;
-	has Protocol::MQTT::Client $.client handles<connected>;
+	has Protocol::MQTT::Client $!client handles<connected>;
 	has Protocol::MQTT::PacketBuffer $!decoder = Protocol::MQTT::PacketBuffer.new;
 	has Protocol::MQTT::Dispatcher $!dispatcher = Protocol::MQTT::Dispatcher.new;
 	has Cancellation $!cue;
@@ -53,7 +53,7 @@ class MQTT::Client {
 		self!connect;
 	}
 
-	method !connect {
+	method !connect() {
 		$!connection-class.connect($!server, $!port).then: -> $connecting {
 			if $connecting.status ~~ Kept {
 				$!connection = $connecting.result;
@@ -92,7 +92,7 @@ class MQTT::Client {
 		}
 	}
 
-	method !send-events(Instant $now) {
+	method !send-events(Instant $now --> Nil) {
 		$!cue.cancel with $!cue;
 		for $!client.next-events($now) -> $message {
 			$!connection.write: $message.encode;
@@ -103,7 +103,7 @@ class MQTT::Client {
 		$!cue = $at ?? $*SCHEDULER.cue($callback, :$at) !! Nil;
 	}
 
-	method publish(Str:D $topic, Str:D $message, Bool:D :$retain = False, Qos:D :$qos = At-most-once) {
+	method publish(Str:D $topic, Str:D $message, Bool:D :$retain = False, Qos:D :$qos = At-most-once --> Promise:D) {
 		my $now = now;
 		return Promise.broken('Invalid topic name') if $topic !~~ Topic;
 		my $result = $!client.publish($topic, $message.encode, $qos, $retain, now);
@@ -127,7 +127,7 @@ class MQTT::Client {
 		return $result;
 	}
 
-	method disconnect() {
+	method disconnect(--> Nil) {
 		$!reconnect-attempts = 0;
 		$!client.disconnect;
 		self!send-events(now);
@@ -149,13 +149,14 @@ sub io-supply(IO::Handle $handle) {
 }
 
 sub MAIN(Str $server = 'test.mosquitto.org', 
-	Str :$client-identifier = 'raku' ~ $*USER,
+	Str :$client-identifier = 'raku-' ~ $*USER,
 	Bool :$tls, 
 	Qos :$qos = At-most-once,
 	Str :$username,
 	Str :$password,
+	Int :$port = $tls ?? 8883 !! 1883,
 	) {
-	my $client = MQTT::Client.new(:$server, :$client-identifier, :$tls, :$username, :$password);
+	my $client = MQTT::Client.new(:$server, :$port, :$client-identifier, :$tls, :$username, :$password);
 	react {
 		whenever $client.connected {
 			say 'Connected';
@@ -201,7 +202,7 @@ sub MAIN(Str $server = 'test.mosquitto.org',
 				$client.disconnect;
 			}
 			default {
-				say "Couldn't parse $_";
+				say "Couldn't parse '$_'";
 			}
 		}
 	}
