@@ -20,8 +20,9 @@ class MQTT::Client {
 	has Supplier $!disconnected handles(:disconnected<Supply>) = Supplier.new;
 	has Str $!server is required;
 	has Int $!port is required;
-	has Bool $.reconnecting = True;
 	has Int:D $!connect-interval is required;
+	has Int:D $!reconnect-attempts is required;
+	has Int:D $!reconnect-tried = 0;
 
 	submethod BUILD(
 		Str:D :$!server!,
@@ -31,6 +32,7 @@ class MQTT::Client {
 		Int:D :$keep-alive-interval = 6,
 		Int:D :$resend-interval     = 1,
 		Int:D :$!connect-interval   = $resend-interval,
+		Int:D :$!reconnect-attempts = 3;
 		Str   :$username,
 		Str   :password($password-string),
 		Protocol::MQTT::Message :$will;
@@ -55,6 +57,7 @@ class MQTT::Client {
 		$!connection-class.connect($!server, $!port).then: -> $connecting {
 			if $connecting.status ~~ Kept {
 				$!connection = $connecting.result;
+				$!reconnect-tried = 0;
 
 				self!send-events(now);
 
@@ -69,7 +72,7 @@ class MQTT::Client {
 				sub done {
 					$!cue.cancel with $!cue;
 					$!disconnected.emit('Disconnected');
-					if $!reconnecting {
+					if self.$!reconnect-tried < $!reconnect-attempts {
 						self!connect;
 						$!client.reconnect;
 						self!send-events(now);
@@ -77,10 +80,14 @@ class MQTT::Client {
 				}
 				$!connection.Supply(:bin).tap(&parser, :&done);
 			}
-			else {
+			elsif self.$!reconnect-tried++ < $!reconnect-attempts {
 				my $now = now;
 				my $at = $now + $!connect-interval;
 				$!cue = $*SCHEDULER.cue({ self!connect unless $!connection }, :$at)
+			}
+			else {
+				$!connected.done;
+				$!disconnected.emit('Couldn\'t connect');
 			}
 		}
 	}
@@ -121,10 +128,11 @@ class MQTT::Client {
 	}
 
 	method disconnect() {
-		$!reconnecting = False;
+		$!reconnect-attempts = 0;
 		$!client.disconnect;
 		self!send-events(now);
 		$!connection.close;
+		$!connected.done;
 	}
 }
 
@@ -150,16 +158,11 @@ sub MAIN(Str $server = 'test.mosquitto.org',
 	my $client = MQTT::Client.new(:$server, :$client-identifier, :$tls, :$username, :$password);
 	react {
 		whenever $client.connected {
-			say 'Connected!';
+			say 'Connected';
+			LAST { done }
 		}
 		whenever $client.disconnected -> $error {
 			say $error;
-			if $client.reconnecting {
-				say 'Reconnecting';
-			}
-			else {
-				done;
-			}
 		}
 		whenever io-supply($*IN).lines {
 			when / ^ sub[scribe]? \s+ $<topic>=[\S+] / {
