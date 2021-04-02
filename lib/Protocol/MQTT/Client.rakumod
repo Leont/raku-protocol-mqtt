@@ -7,7 +7,7 @@ use Protocol::MQTT::Message :message;
 use Protocol::MQTT::Packet :packets;
 use Protocol::MQTT::Qos :qos;
 
-our enum ConnState is export(:state) <Unconnected Connecting Connected Disconnecting Disconnected>;
+our enum ConnState is export(:state) <Disconnected Unconnected Connecting Connected Disconnecting>;
 
 my class FollowUp {
 	has Instant:D $.expiration    is required is rw;
@@ -23,8 +23,7 @@ has Int:D       $.connect-interval                            = $!resend-interva
 has Str         $.username;
 has Blob        $.password;
 has Message     $.will;
-has ConnState:D $.state                                       = Unconnected;
-has Supplier:D  $!connected handles(:connected<Supply>)       = Supplier.new;
+has ConnState:D $.state                                       = Disconnected;
 has Supplier:D  $!disconnected handles(:disconnected<Supply>) = Supplier.new;
 has Bool        $!persistent-session                          = False;
 
@@ -34,13 +33,17 @@ has Instant     $!last-packet-received;
 has Instant     $!last-ping-sent;
 has Instant     $.next-expiration;
 has Int         $!packet-order                                = 0;
+has Promise     $!connect-promise;
 
 has FollowUp    %!follow-ups handles(:pending-acknowledgements<elems>);
 has Bool        %!blocked;
 has Qos         %!qos-for;
 
-method reconnect() {
+method connect() {
 	$!state = Unconnected;
+	$!connect-promise.break if $!connect-promise && $!connect-promise.status ~~ Planned;
+	$!connect-promise = Promise.new;
+	return $!connect-promise;
 }
 
 method !add-follow-up(Int:D $packet-id, Packet:D $packet, Instant:D $expiration, Promise:D $promise = Promise.new --> Promise) {
@@ -81,12 +84,13 @@ multi method received-packet(Packet::ConnAck:D $packet, Instant $now --> Nil) {
 				my $packet-id = self!next-id;
 				my $subscribe = Packet::Subscribe.new(:$packet-id, :@subscriptions);
 				@!queue.push: $subscribe;
-				my $promise = self!add-follow-up($packet-id, $subscribe, $now + $!resend-interval);
-				$promise.then: -> $success { $!connected.emit($packet.return-code) if $success.status ~~ Kept }
+				self!add-follow-up($packet-id, $subscribe, $now + $!resend-interval, $!connect-promise);
+				$!connect-promise = Nil;
 				return;
 			}
 		}
-		$!connected.emit($packet.return-code);
+		$!connect-promise.keep($packet.return-code);
+		$!connect-promise = Nil;
 	}
 	else {
 		$!disconnected.emit("Could not connect: " ~ $packet.return-code.subst('-', ' '));
@@ -232,5 +236,16 @@ method unsubscribe(Str:D $topic, Instant:D $now --> Promise:D) {
 }
 
 method disconnect(--> Nil) {
-	$!state = Disconnecting;
+	given $!state {
+		when Unconnected|Connecting {
+			$!connect-promise.break;
+			$!state = Disconnected;
+			$!next-expiration = Nil;
+			%!follow-ups = ();
+			%!blocked = ();
+		}
+		when Connected {
+			$!state = Disconnecting;
+		}
+	}
 }

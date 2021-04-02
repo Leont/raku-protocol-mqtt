@@ -13,16 +13,17 @@ use Getopt::Long;
 class MQTT::Client {
 	has IO::Socket::Async:U $!connection-class;
 	has IO::Socket::Async $!connection;
-	has Protocol::MQTT::Client $!client handles<connected>;
+	has Protocol::MQTT::Client $!client;
 	has Protocol::MQTT::PacketBuffer $!decoder = Protocol::MQTT::PacketBuffer.new;
 	has Protocol::MQTT::Dispatcher $!dispatcher = Protocol::MQTT::Dispatcher.new;
 	has Cancellation $!cue;
+	has Supplier  $!connected handles(:connected<Supply>)      = Supplier.new;
 	has Supplier $!disconnected handles(:disconnected<Supply>) = Supplier.new;
 	has Str $!server is required;
 	has Int $!port is required;
 	has Int:D $!connect-interval is required;
 	has Int:D $!reconnect-attempts is required;
-	has Int:D $!reconnect-tried = 0;
+	has Int:D $!reconnect-tried is required;
 
 	submethod BUILD(
 		Str:D :$!server!,
@@ -44,21 +45,30 @@ class MQTT::Client {
 		$!client.incoming.tap: -> $message {
 			$!dispatcher.dispatch($message);
 		}
-		$!client.disconnected.tap: -> $disconnected {
-			$!connection.close;
-			$!connection = Nil;
+		$!client.disconnected.tap: -> $cause {
+			self!disconnected;
 		}
 
 		$!connection-class = $tls ?? (require IO::Socket::Async::SSL) !! IO::Socket::Async;
+		$!reconnect-tried = 0;
 		self!connect;
 	}
 
-	method !connect() {
+	method !connect(--> Nil) {
 		$!connection-class.connect($!server, $!port).then: -> $connecting {
 			if $connecting.status ~~ Kept {
 				$!connection = $connecting.result;
 				$!reconnect-tried = 0;
 
+				my $connect-promise = $!client.connect;
+				$connect-promise.then: -> $success {
+					if $success.status ~~ Kept  {
+						$!connected.emit($success.result);
+					}
+					else {
+						self!disconnected;
+					}
+				}
 				self!send-events(now);
 
 				sub parser(buf8 $received) {
@@ -74,7 +84,7 @@ class MQTT::Client {
 					$!disconnected.emit('Disconnected');
 					if self.$!reconnect-tried < $!reconnect-attempts {
 						self!connect;
-						$!client.reconnect;
+						$!client.connect;
 						self!send-events(now);
 					}
 				}
@@ -90,6 +100,12 @@ class MQTT::Client {
 				$!disconnected.emit('Couldn\'t connect');
 			}
 		}
+	}
+
+	method !disconnected(--> Nil) {
+		my $connection = $!connection;
+		$!connection = Nil;
+		$connection.close;
 	}
 
 	method !send-events(Instant $now --> Nil) {

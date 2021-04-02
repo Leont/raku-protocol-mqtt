@@ -17,14 +17,19 @@ my $client = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interv
 my $now = now;
 
 subtest 'Connecting', {
+	is($client.state, Disconnected, 'state=Disconnected');
+	my $promise = $client.connect;
 	is($client.state, Unconnected, 'state=Unconnected');
+	is($promise.status, Planned, 'Promise is planned');
 	$now++;
 	my @messages = $client.next-events($now);
 	is($client.state, Connecting, 'state=Connecting');
 	is(+@messages, 1, 'Sending one message');
+	is($promise.status, Planned, 'Promise is stil planned');
 	is-deeply(@messages[0], Packet::Connect.new(:$client-identifier, :$keep-alive-interval), 'Packet is as expected');
 
 	$client.received-packet(Packet::ConnAck.new, $now + 1);
+	is($promise.status, Kept, 'Promise is kept');
 	is($client.state, Connected, 'state=Connected');
 }
 
@@ -360,6 +365,7 @@ subtest 'Receiving Qos=Exactly-once', {
 subtest 'Disconnect', {
 	$now++;
 	my $client2 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
+	$client2.connect;
 	$client2.next-events($now);
 	$now++;
 	$client2.received-packet(Packet::ConnAck.new, $now);
@@ -381,17 +387,27 @@ subtest 'Timeout', {
 subtest 'Connect timeout', {
 	$now++;
 	my $client3 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
+	is($client3.state, Disconnected, 'State starts as disconnected');
+	my $promise = $client3.connect;
+	is($promise.status, Planned, 'Promise is planned');
 	is($client3.state, Unconnected, 'State starts as unconnected');
 	is-deeply($client3.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
 	is($client3.state, Connecting, 'state is connected after sending connect package');
 	$now += $resend-interval + 1;
 	is-deeply($client3.next-events($now), [], 'Don\'t have packets after connect timeout');
-	is($client3.state, Unconnected, 'Disconnected after connect timeout');
+	is($client3.state, Unconnected, 'Unconnected after connect timeout');
+	is($promise.status, Planned, 'Promise is planned');
+	$client3.disconnect;
+	is-deeply($client3.next-events($now), [], 'Don\'t have packets after disconnect');
+	is($client3.state, Disconnected, 'Unconnected after disconnect');
+	is($promise.status, Broken, 'Promise is broken');
 }
 
 subtest 'Reconnect', {
 	my $client4 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
-	is($client4.state, Unconnected, 'We are connected');
+	is($client4.state, Disconnected, 'We are connected');
+	$client4.connect;
+	is($client4.state, Unconnected, 'State starts as unconnected');
 	is-deeply($client4.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
 	$client4.received-packet(Packet::ConnAck.new, $now);
 	is($client4.state, Connected, 'We are connected');
@@ -403,7 +419,8 @@ subtest 'Reconnect', {
 	$client4.received-packet(Packet::SubAck.new(:packet-id(@messages[0].packet-id)), $now);
 	my $packet-id = @messages[0].packet-id;
 
-	$client4.reconnect;
+	my $promise = $client4.connect;
+	is($promise.status, Planned, 'Promise is planned');
 	$now++;
 
 	is($client4.state, Unconnected, 'We are connected');
@@ -419,27 +436,28 @@ subtest 'Persistent reconnect', {
 	my $topic = 'foo/bar';
 	my $message = 'Hello'.encode;
 	my $qos = At-least-once;
-	my $client4 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval, :persistent-session);
-	is($client4.state, Unconnected, 'We are connected');
-	is-deeply($client4.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
-	$client4.received-packet(Packet::ConnAck.new, $now);
-	is($client4.state, Connected, 'We are connected');
+	my $client5 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval, :persistent-session);
+	$client5.connect;
+	is($client5.state, Unconnected, 'We are connected');
+	is-deeply($client5.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
+	$client5.received-packet(Packet::ConnAck.new, $now);
+	is($client5.state, Connected, 'We are connected');
 	$now++;
-	my $supply = $client4.publish($topic, $message, $qos, False, $now);
-	my @messages = $client4.next-events($now);
+	my $supply = $client5.publish($topic, $message, $qos, False, $now);
+	my @messages = $client5.next-events($now);
 	is(+@messages, 1, 'Sending one message');
 	isa-ok(@messages[0], Packet::Publish, 'Message is a Publish');
 	my $packet-id = @messages[0].packet-id;
 	is-deeply(@messages[0], Packet::Publish.new(:$packet-id, :$topic, :$message, :$qos, :!retain, :!dup), 'publish is as expected');
 
-	$client4.reconnect;
+	$client5.connect;
 	$now++;
 
-	is($client4.state, Unconnected, 'We are connected');
-	is-deeply($client4.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
-	$client4.received-packet(Packet::ConnAck.new(:session-acknowledge), $now);
-	is($client4.state, Connected, 'We are connected');
-	my @messages2 = $client4.next-events($now);
+	is($client5.state, Unconnected, 'We are connected');
+	is-deeply($client5.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
+	$client5.received-packet(Packet::ConnAck.new(:session-acknowledge), $now);
+	is($client5.state, Connected, 'We are connected');
+	my @messages2 = $client5.next-events($now);
 	is(+@messages2, 1, 'Sending one message again');
 	is-deeply(@messages2[0], Packet::Publish.new(:$packet-id, :$topic, :$message, :$qos, :!retain, :dup), 'Publish resend is as expected');
 }
