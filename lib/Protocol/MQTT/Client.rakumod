@@ -26,6 +26,7 @@ has Message     $.will;
 has ConnState:D $.state                                       = Unconnected;
 has Supplier:D  $!connected handles(:connected<Supply>)       = Supplier.new;
 has Supplier:D  $!disconnected handles(:disconnected<Supply>) = Supplier.new;
+has Bool        $!persistent-session                          = False;
 
 has Packet      @!queue;
 has Supplier    $!incoming handles(:incoming<Supply>)         = Supplier.new;
@@ -65,17 +66,25 @@ multi method received-packet(Packet::ConnAck:D $packet, Instant $now --> Nil) {
 		if $!keep-alive-interval {
 			$!next-expiration = $now + $!keep-alive-interval;
 		}
-		%!follow-ups = ();
-		%!blocked = ();
+		if $packet.session-acknowledge {
+			for %!follow-ups.values -> $follow-up {
+				@!queue.push: $follow-up.packet;
+				$follow-up.expiration = $now + $!resend-interval;
+			}
+		}
+		else {
+			%!follow-ups = ();
+			%!blocked = ();
 
-		if %!qos-for {
-			my @subscriptions = %!qos-for.kv.map: -> $topic, $qos { Packet::Subscribe::Subscription.new(:$topic, :$qos) }
-			my $packet-id = self!next-id;
-			my $subscribe = Packet::Subscribe.new(:$packet-id, :@subscriptions);
-			@!queue.push: $subscribe;
-			my $promise = self!add-follow-up($packet-id, $subscribe, $now + $!resend-interval);
-			$promise.then: -> $success { $!connected.emit($packet.return-code) if $success.status ~~ Kept }
-			return;
+			if %!qos-for {
+				my @subscriptions = %!qos-for.kv.map: -> $topic, $qos { Packet::Subscribe::Subscription.new(:$topic, :$qos) }
+				my $packet-id = self!next-id;
+				my $subscribe = Packet::Subscribe.new(:$packet-id, :@subscriptions);
+				@!queue.push: $subscribe;
+				my $promise = self!add-follow-up($packet-id, $subscribe, $now + $!resend-interval);
+				$promise.then: -> $success { $!connected.emit($packet.return-code) if $success.status ~~ Kept }
+				return;
+			}
 		}
 		$!connected.emit($packet.return-code);
 	}
@@ -127,10 +136,11 @@ method next-events(Instant:D $now --> List:D) {
 	my @result;
 	given $!state {
 		when Unconnected {
+			my $clean-session = !$!persistent-session;
 			$!state = Connecting;
 			$!last-ping-sent = $now;
 			$!next-expiration = $now + $!connect-interval;
-			@result.push: Packet::Connect.new(:$!client-identifier, :$!keep-alive-interval, :$!username, :$!password, :$!will);
+			@result.push: Packet::Connect.new(:$!client-identifier, :$!keep-alive-interval, :$clean-session, :$!username, :$!password, :$!will);
 		}
 		when Connecting {
 			if $!next-expiration < $now {

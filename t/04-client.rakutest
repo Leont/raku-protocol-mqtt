@@ -415,4 +415,33 @@ subtest 'Reconnect', {
 	is-deeply(@messages2[0].subscriptions.list, Array[Packet::Subscribe::Subscription].new(Packet::Subscribe::Subscription.new(:topic<foo/bar>, :qos(At-most-once))), 'Subscribe resend is as expected');
 }
 
+subtest 'Persistent reconnect', {
+	my $topic = 'foo/bar';
+	my $message = 'Hello'.encode;
+	my $qos = At-least-once;
+	my $client4 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval, :persistent-session);
+	is($client4.state, Unconnected, 'We are connected');
+	is-deeply($client4.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
+	$client4.received-packet(Packet::ConnAck.new, $now);
+	is($client4.state, Connected, 'We are connected');
+	$now++;
+	my $supply = $client4.publish($topic, $message, $qos, False, $now);
+	my @messages = $client4.next-events($now);
+	is(+@messages, 1, 'Sending one message');
+	isa-ok(@messages[0], Packet::Publish, 'Message is a Publish');
+	my $packet-id = @messages[0].packet-id;
+	is-deeply(@messages[0], Packet::Publish.new(:$packet-id, :$topic, :$message, :$qos, :!retain, :!dup), 'publish is as expected');
+
+	$client4.reconnect;
+	$now++;
+
+	is($client4.state, Unconnected, 'We are connected');
+	is-deeply($client4.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
+	$client4.received-packet(Packet::ConnAck.new(:session-acknowledge), $now);
+	is($client4.state, Connected, 'We are connected');
+	my @messages2 = $client4.next-events($now);
+	is(+@messages2, 1, 'Sending one message again');
+	is-deeply(@messages2[0], Packet::Publish.new(:$packet-id, :$topic, :$message, :$qos, :!retain, :dup), 'Publish resend is as expected');
+}
+
 done-testing;
