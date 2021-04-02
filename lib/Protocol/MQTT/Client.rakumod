@@ -7,7 +7,7 @@ use Protocol::MQTT::Message :message;
 use Protocol::MQTT::Packet :packets;
 use Protocol::MQTT::Qos :qos;
 
-my enum ConnState is export(:state) <Unconnected Connecting Connected Disconnecting Disconnected>;
+our enum ConnState is export(:state) <Unconnected Connecting Connected Disconnecting Disconnected>;
 
 my class FollowUp {
 	has Instant:D $.expiration    is required is rw;
@@ -17,25 +17,30 @@ my class FollowUp {
 }
 
 has Str:D       $.client-identifier is required;
-has Int         $.keep-alive-interval                 = 60;
-has Int:D       $.resend-interval                     = 10;
-has Int:D       $.connect-interval                    = $!resend-interval;
+has Int         $.keep-alive-interval                         = 60;
+has Int:D       $.resend-interval                             = 10;
+has Int:D       $.connect-interval                            = $!resend-interval;
 has Str         $.username;
 has Blob        $.password;
 has Message     $.will;
-has ConnState:D $.state                               = Unconnected;
-has Promise:D   $.connected                           = Promise.new;
-has Promise:D   $.disconnected                        = Promise.new;
+has ConnState:D $.state                                       = Unconnected;
+has Supplier:D  $!connected handles(:connected<Supply>)       = Supplier.new;
+has Supplier:D  $!disconnected handles(:disconnected<Supply>) = Supplier.new;
 
 has Packet      @!queue;
-has Supplier    $!incoming handles(:incoming<Supply>) = Supplier.new;
+has Supplier    $!incoming handles(:incoming<Supply>)         = Supplier.new;
 has Instant     $!last-packet-received;
 has Instant     $!last-ping-sent;
 has Instant     $.next-expiration;
-has Int         $!packet-order                        = 0;
+has Int         $!packet-order                                = 0;
 
 has FollowUp    %!follow-ups handles(:pending-acknowledgements<elems>);
 has Bool        %!blocked;
+has Qos         %!qos-for;
+
+method reconnect() {
+	$!state = Unconnected;
+}
 
 method !add-follow-up(Int:D $packet-id, Packet:D $packet, Instant:D $expiration, Promise:D $promise = Promise.new --> Promise) {
 	my $order = $!packet-order++;
@@ -57,13 +62,25 @@ proto method received-packet(Packet:D, Instant $now) {
 multi method received-packet(Packet::ConnAck:D $packet, Instant $now --> Nil) {
 	if $packet.success {
 		$!state = Connected;
-		$!connected.keep($packet.return-code);
 		if $!keep-alive-interval {
 			$!next-expiration = $now + $!keep-alive-interval;
 		}
+		%!follow-ups = ();
+		%!blocked = ();
+
+		if %!qos-for {
+			my @subscriptions = %!qos-for.kv.map: -> $topic, $qos { Packet::Subscribe::Subscription.new(:$topic, :$qos) }
+			my $packet-id = self!next-id;
+			my $subscribe = Packet::Subscribe.new(:$packet-id, :@subscriptions);
+			@!queue.push: $subscribe;
+			my $promise = self!add-follow-up($packet-id, $subscribe, $now + $!resend-interval);
+			$promise.then: -> $success { $!connected.emit($packet.return-code) if $success.status ~~ Kept }
+			return;
+		}
+		$!connected.emit($packet.return-code);
 	}
 	else {
-		$!connected.break($packet.return-code);
+		$!disconnected.emit("Could not connect: " ~ $packet.return-code.subst('-', ' '));
 	}
 }
 multi method received-packet(Packet::Publish:D (:$packet-id, :$topic, :$message, :$qos, :$retain, :$dup), Instant $ --> Nil) {
@@ -117,15 +134,16 @@ method next-events(Instant:D $now --> List:D) {
 		}
 		when Connecting {
 			if $!next-expiration < $now {
-				$!state = Disconnected;
-				$!disconnected.break('Connect timeout');
+				$!state = Unconnected;
+				$!disconnected.emit('Connect timeout');
+				$!next-expiration = $now + $!connect-interval;
 			}
 		}
 		when Connected {
 			if $!keep-alive-interval && $!last-packet-received + 2 * $!keep-alive-interval < $now {
 				$!state = Disconnected;
 				$!next-expiration = Nil;
-				$!disconnected.break('Timeout');
+				$!disconnected.emit('Timeout');
 				succeed;
 			}
 
@@ -153,6 +171,8 @@ method next-events(Instant:D $now --> List:D) {
 		when Disconnecting {
 			$!state = Disconnected;
 			$!next-expiration = Nil;
+			%!follow-ups = ();
+			%!blocked = ();
 			@result.push: Packet::Disconnect.new;
 		}
 	}
@@ -187,6 +207,7 @@ multi method subscribe(Str:D $topic, Qos:D $qos, Instant:D $now --> Promise:D) {
 	my $packet = Packet::Subscribe.new(:$packet-id, :$topic, :$qos);
 	my $expiration = $now + $!resend-interval;
 
+	%!qos-for{$topic} = $qos;
 	@!queue.push: $packet;
 	return self!add-follow-up($packet-id, $packet, $expiration);
 }
