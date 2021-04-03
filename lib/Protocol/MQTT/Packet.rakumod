@@ -2,7 +2,7 @@ use v6.d;
 
 unit package Protocol::MQTT:ver<0.0.1>:auth<cpan:LEONT>;
 
-use Protocol::MQTT::Error;
+use Protocol::MQTT::Error :exceptions;
 use Protocol::MQTT::Message :message;
 use Protocol::MQTT::Subsets;
 use Protocol::MQTT::Qos :qos;
