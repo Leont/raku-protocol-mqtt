@@ -27,7 +27,7 @@ class MQTT::Client {
 
 	submethod BUILD(
 		Str:D :$!server!,
-		Str:D :$client-identifier!,
+		Str:D :$client-identifier   = Protocol::MQTT::Client.generate-identifier,
 		Bool  :$tls,
 		Int:D :$!port               = $tls ?? 8883 !! 1883,
 		Int:D :$keep-alive-interval = 6,

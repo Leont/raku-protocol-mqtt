@@ -16,7 +16,7 @@ my class FollowUp {
 	has Int:D     $.order         is required;
 }
 
-has Str:D       $.client-identifier is required;
+has Str:D       $.client-identifier                           = self.generate-identifier;
 has Int         $.keep-alive-interval                         = 60;
 has Int:D       $.resend-interval                             = 10;
 has Int:D       $.connect-interval                            = $!resend-interval;
@@ -38,6 +38,11 @@ has Promise     $!connect-promise;
 has FollowUp    %!follow-ups handles(:pending-acknowledgements<elems>);
 has Bool        %!blocked;
 has Qos         %!qos-for;
+
+
+method generate-identifier(:$prefix = 'raku-', :$length = 8, :@charset = 'a' .. 'z') {
+	return $prefix ~ @charset.roll($length).join('');
+}
 
 method connect() {
 	$!state = Unconnected;
