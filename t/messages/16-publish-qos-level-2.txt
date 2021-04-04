@@ -1,7 +1,7 @@
 Packet::Publish.new(
  :qos(Exactly-once),
  :topic<testing>,
- :message(buf8('test'.encode)),
+ :payload(buf8('test'.encode)),
  :1packet-id,
  :retain,
 )

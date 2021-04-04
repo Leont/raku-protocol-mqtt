@@ -42,7 +42,7 @@ subtest 'Sending Qos=At-most-once', {
 	my @messages = $client.next-events($now);
 	is(+@messages, 1, 'Sending one message');
 
-	is-deeply(@messages[0], Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(At-most-once), :!retain, :!dup), 'Packet is as expected');
+	is-deeply(@messages[0], Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-most-once), :!retain, :!dup), 'Packet is as expected');
 
 	is($client.next-expiration, $now + $keep-alive-interval, 'Next expiration at keep-alive');
 }
@@ -62,7 +62,7 @@ subtest 'Sending Qos=At-least-once', {
 			isa-ok($message, Packet::Publish);
 			$packet-id = $message.packet-id;
 			ok($packet-id, 'Packet id is present');
-			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(At-least-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
+			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-least-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
 		}
 
 		is($client.next-expiration, $now + $resend-interval, 'Next expiration is at resend');
@@ -80,7 +80,7 @@ subtest 'Sending Qos=At-least-once', {
 		given @messages[0] -> $message {
 			isa-ok($message, Packet::Publish, 'Packet is a publish');
 			is($message.packet-id, $packet-id, 'Packet id has expected value');
-			my $expected = Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(At-least-once), :!retain, :dup, :$packet-id);
+			my $expected = Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-least-once), :!retain, :dup, :$packet-id);
 			is-deeply($message, $expected, 'Packet is as expected');
 		}
 
@@ -113,7 +113,7 @@ subtest 'Sending Qos=Exactly-once', {
 			isa-ok($message, Packet::Publish);
 			$packet-id = $message.packet-id;
 			ok($packet-id, 'Packet id is present');
-			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(Exactly-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
+			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(Exactly-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
 		}
 
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
@@ -130,7 +130,7 @@ subtest 'Sending Qos=Exactly-once', {
 		given @messages[0] -> $message {
 			isa-ok($message, Packet::Publish, 'Packet is a publish');
 			is($message.packet-id, $packet-id, 'Packet id has expected value');
-			my $expected = Packet::Publish.new(:topic<foo/bar>, :message('whatever'.encode), :qos(Exactly-once), :!retain, :dup, :$packet-id);
+			my $expected = Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(Exactly-once), :!retain, :dup, :$packet-id);
 			is-deeply($message, $expected, 'Packet is as expected');
 		}
 
@@ -211,21 +211,21 @@ subtest 'Receiving Qos=At-most-once', {
 
 	subtest 'First message', {
 		$now++;
-		$client.received-packet(Packet::Publish.new(:2packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		$client.received-packet(Packet::Publish.new(:2packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [], 'No events expected');
 
 		is(+@all, 1, 'Received first publish');
-		is-deeply(@all[0], Message.new(:topic<foo>, :message('Hello world'.encode)), 'publish is "Hello world"');
+		is-deeply(@all[0], Message.new(:topic<foo>, :payload('Hello world'.encode)), 'publish is "Hello world"');
 	}
 
 	subtest 'Second message', {
 		$now++;
 
-		$client.received-packet(Packet::Publish.new(:3packet-id, :topic<foo>, :message('Hello again'.encode), :$qos), $now);
+		$client.received-packet(Packet::Publish.new(:3packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [], 'No events expected');
 
 		is(+@all, 2, 'Received second publish');
-		is-deeply(@all[1], Message.new(:topic<foo>, :message('Hello again'.encode)), 'publish is "Hello again"');
+		is-deeply(@all[1], Message.new(:topic<foo>, :payload('Hello again'.encode)), 'publish is "Hello again"');
 	}
 }
 
@@ -270,21 +270,21 @@ subtest 'Receiving Qos=At-least-once', {
 
 	subtest 'First message', {
 		$now++;
-		$client.received-packet(Packet::Publish.new(:5packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		$client.received-packet(Packet::Publish.new(:5packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [ Packet::PubAck.new(:5packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 1, 'Received first publish');
-		is-deeply(@all[0], Message.new(:topic<foo>, :message('Hello world'.encode), :qos(At-least-once)), 'publish is "Hello world"');
+		is-deeply(@all[0], Message.new(:topic<foo>, :payload('Hello world'.encode), :qos(At-least-once)), 'publish is "Hello world"');
 	}
 
 	subtest 'Second message', {
 		$now++;
 
-		$client.received-packet(Packet::Publish.new(:6packet-id, :topic<foo>, :message('Hello again'.encode), :$qos), $now);
+		$client.received-packet(Packet::Publish.new(:6packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [ Packet::PubAck.new(:6packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 2, 'Received second publish');
-		is-deeply(@all[1], Message.new(:topic<foo>, :message('Hello again'.encode), :qos(At-least-once)), 'publish is "Hello again"');
+		is-deeply(@all[1], Message.new(:topic<foo>, :payload('Hello again'.encode), :qos(At-least-once)), 'publish is "Hello again"');
 	}
 }
 
@@ -329,13 +329,13 @@ subtest 'Receiving Qos=Exactly-once', {
 
 	subtest 'First message', {
 		$now++;
-		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [ Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 1, 'Received first publish');
-		is-deeply(@all[0], Message.new(:topic<foo>, :message('Hello world'.encode), :qos(Exactly-once)), 'publish is "Hello world"');
+		is-deeply(@all[0], Message.new(:topic<foo>, :payload('Hello world'.encode), :qos(Exactly-once)), 'publish is "Hello world"');
 
-		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :message('Hello world'.encode), :$qos), $now);
+		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [ Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 1, 'Ignored repeat of publish');
@@ -343,7 +343,7 @@ subtest 'Receiving Qos=Exactly-once', {
 		$client.received-packet(Packet::PubRel.new(:8packet-id), $now);
 		is-deeply($client.next-events($now), [ Packet::PubComp.new(:8packet-id) ], 'Release trigger Complete');
 
-		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :message('Hello world'.encode), :qos(At-most-once)), $now);
+		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :qos(At-most-once)), $now);
 
 		is(+@all, 2, 'After PubComp, packet-id may be used again');
 	}
@@ -351,11 +351,11 @@ subtest 'Receiving Qos=Exactly-once', {
 	subtest 'Second message', {
 		$now++;
 
-		$client.received-packet(Packet::Publish.new(:9packet-id, :topic<foo>, :message('Hello again'.encode), :$qos), $now);
+		$client.received-packet(Packet::Publish.new(:9packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [ Packet::PubRec.new(:9packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 3, 'Received second publish');
-		is-deeply(@all[2], Message.new(:topic<foo>, :message('Hello again'.encode), :qos(Exactly-once)), 'publish is "Hello again"');
+		is-deeply(@all[2], Message.new(:topic<foo>, :payload('Hello again'.encode), :qos(Exactly-once)), 'publish is "Hello again"');
 
 		$client.received-packet(Packet::PubRel.new(:9packet-id), $now);
 		is-deeply($client.next-events($now), [ Packet::PubComp.new(:9packet-id) ], 'Release trigger Complete');
@@ -434,7 +434,7 @@ subtest 'Reconnect', {
 
 subtest 'Persistent reconnect', {
 	my $topic = 'foo/bar';
-	my $message = 'Hello'.encode;
+	my $payload = 'Hello'.encode;
 	my $qos = At-least-once;
 	my $client5 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval, :persistent-session);
 	$client5.connect;
@@ -443,12 +443,12 @@ subtest 'Persistent reconnect', {
 	$client5.received-packet(Packet::ConnAck.new, $now);
 	is($client5.state, Connected, 'We are connected');
 	$now++;
-	my $supply = $client5.publish($topic, $message, $qos, False, $now);
+	my $supply = $client5.publish($topic, $payload, $qos, False, $now);
 	my @messages = $client5.next-events($now);
 	is(+@messages, 1, 'Sending one message');
 	isa-ok(@messages[0], Packet::Publish, 'Message is a Publish');
 	my $packet-id = @messages[0].packet-id;
-	is-deeply(@messages[0], Packet::Publish.new(:$packet-id, :$topic, :$message, :$qos, :!retain, :!dup), 'publish is as expected');
+	is-deeply(@messages[0], Packet::Publish.new(:$packet-id, :$topic, :$payload, :$qos, :!retain, :!dup), 'publish is as expected');
 
 	$client5.connect;
 	$now++;
@@ -459,7 +459,7 @@ subtest 'Persistent reconnect', {
 	is($client5.state, Connected, 'We are connected');
 	my @messages2 = $client5.next-events($now);
 	is(+@messages2, 1, 'Sending one message again');
-	is-deeply(@messages2[0], Packet::Publish.new(:$packet-id, :$topic, :$message, :$qos, :!retain, :dup), 'Publish resend is as expected');
+	is-deeply(@messages2[0], Packet::Publish.new(:$packet-id, :$topic, :$payload, :$qos, :!retain, :dup), 'Publish resend is as expected');
 }
 
 done-testing;

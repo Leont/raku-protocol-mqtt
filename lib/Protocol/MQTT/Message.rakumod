@@ -6,7 +6,7 @@ use Protocol::MQTT::Qos :qos;
 
 our class Message is export(:message) {
 	has Str:D   $.topic is required;
-	has blob8:D $.message is required;
+	has blob8:D $.payload is required;
 	has Bool:D  $.retain = False;
 	has Qos:D   $.qos = At-most-once;
 }

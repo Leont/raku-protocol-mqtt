@@ -169,9 +169,6 @@ my sub pack-flags(*@values) {
 }
 
 our role Packet[Type $type, Qos $qos = At-most-once] is export(:packets :decoder) {
-	method message-type(--> Type) {
-		return $type;
-	}
 	method header-byte(--> Byte) {
 		return pack-flags(False, $qos, False, $type);
 	}
@@ -234,8 +231,8 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 
 		if $will-flag {
 			my $topic = $buffer.decode-string;
-			my $message = $buffer.decode-blob;
-			%args<will> = Message.new(:$topic, :$message, :$qos, :$retain);
+			my $payload = $buffer.decode-blob;
+			%args<will> = Message.new(:$topic, :$payload, :$qos, :$retain);
 		}
 		if $username-flag {
 			%args<username> = $buffer.decode-string;
@@ -255,7 +252,7 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 		$buffer.encode-string($!client-identifier);
 		with $!will {
 			$buffer.encode-string($!will.topic);
-			$buffer.encode-blob($!will.message);
+			$buffer.encode-blob($!will.payload);
 		}
 		$buffer.encode-string($!username) with $!username;
 		$buffer.encode-blob($!password) with $!password;
@@ -298,7 +295,7 @@ class Packet::Publish does Packet[Type::Publish] is export(:packets) {
 
 	has Str:D $.topic is required;
 	has Short $.packet-id;
-	has Blob:D $.message is required;
+	has Blob:D $.payload is required;
 
 	submethod TWEAK(:$!qos = At-most-once) {
 		die Error::Semantic.new('') if $!topic !~~ Topic;
@@ -310,9 +307,9 @@ class Packet::Publish does Packet[Type::Publish] is export(:packets) {
 
 		my $topic = $buffer.decode-string;
 		my $packet-id = $qos ?? $buffer.decode-short !! Short;
-		my $message = $buffer.rest;
+		my $payload = $buffer.rest;
 
-		return self.new(:$dup, :$qos, :$retain, :$topic, :$packet-id, :$message);
+		return self.new(:$dup, :$qos, :$retain, :$topic, :$packet-id, :$payload);
 	}
 	method header-byte(--> Byte) {
 		return pack-flags($!retain, $!qos, $!dup, Type::Publish);
@@ -320,7 +317,7 @@ class Packet::Publish does Packet[Type::Publish] is export(:packets) {
 	method !encode-body(Packet:D: EncodeBuffer $buffer --> Nil) {
 		$buffer.encode-string($!topic);
 		$buffer.encode-short($!packet-id) if $!qos;
-		$buffer.append-buffer($!message);
+		$buffer.append-buffer($!payload);
 	}
 }
 

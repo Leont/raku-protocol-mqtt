@@ -16,7 +16,7 @@ subtest 'First', {
 	my @third;
 	$dispatcher.add-filter('a/#').tap: { @third.push($^message) };
 
-	my $message1 = Message.new(:topic<a>, :message('a'.encode));
+	my $message1 = Message.new(:topic<a>, :payload('a'.encode));
 	subtest 'topic=a', {
 		$dispatcher.dispatch($message1);
 		is-deeply(@all, [$message1], '# matches');
@@ -24,7 +24,7 @@ subtest 'First', {
 		is-deeply(@third, [$message1], 'a/# matches');
 	}
 
-	my $message2 = Message.new(:topic<a/b>, :message('b'.encode));
+	my $message2 = Message.new(:topic<a/b>, :payload('b'.encode));
 	subtest 'topic=a/b', {
 		$dispatcher.dispatch($message2);
 		is-deeply(@all, [$message1, $message2], '# matches');
@@ -32,7 +32,7 @@ subtest 'First', {
 		is-deeply(@third, [$message1, $message2], 'a/# matches');
 	}
 
-	my $message3 = Message.new(:topic<$a>, :message('c'.encode));
+	my $message3 = Message.new(:topic<$a>, :payload('c'.encode));
 	subtest 'topic=$a', {
 		$dispatcher.dispatch($message3);
 		is-deeply(@all, [$message1, $message2], '# doesn\'t match');

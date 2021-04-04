@@ -101,7 +101,7 @@ multi method received-packet(Packet::ConnAck:D $packet, Instant $now --> Nil) {
 		$!disconnected.emit("Could not connect: " ~ $packet.return-code.subst('-', ' '));
 	}
 }
-multi method received-packet(Packet::Publish:D (:$packet-id, :$topic, :$message, :$qos, :$retain, :$dup), Instant $ --> Nil) {
+multi method received-packet(Packet::Publish:D (:$packet-id, :$topic, :$payload, :$qos, :$retain, :$dup), Instant $ --> Nil) {
 	given $qos {
 		when At-least-once {
 			@!queue.push: Packet::PubAck.new(:$packet-id);
@@ -112,8 +112,8 @@ multi method received-packet(Packet::Publish:D (:$packet-id, :$topic, :$message,
 			%!blocked{$packet-id} = True;
 		}
 	}
-	my $update = Message.new(:$topic, :$message, :$qos, :$retain);
-	$!incoming.emit($update);
+	my $message = Message.new(:$topic, :$payload, :$qos, :$retain);
+	$!incoming.emit($message);
 }
 multi method received-packet(Packet::PubAck:D (:$packet-id), Instant $ --> Nil) {
 	self!confirm-follow-up($packet-id);
@@ -205,17 +205,17 @@ method !next-id(--> Int:D) {
 	}
 }
 
-method publish(Str:D $topic, Blob:D $message, Qos:D $qos, Bool:D $retain, Instant:D $now --> Promise:D) {
+method publish(Str:D $topic, Blob:D $payload, Qos:D $qos, Bool:D $retain, Instant:D $now --> Promise:D) {
 	given $qos {
 		when At-most-once {
-			@!queue.push: Packet::Publish.new(:$topic, :$message, :$retain, :$qos);
+			@!queue.push: Packet::Publish.new(:$topic, :$payload, :$retain, :$qos);
 			return Promise.kept;
 		}
 		when At-least-once|Exactly-once {
 			my $packet-id = self!next-id;
-			my $resend = Packet::Publish.new(:$topic, :$message, :$retain, :$qos, :$packet-id, :dup);
+			my $resend = Packet::Publish.new(:$topic, :$payload, :$retain, :$qos, :$packet-id, :dup);
 			my $expiration = $now + $!resend-interval;
-			@!queue.push: Packet::Publish.new(:$topic, :$message, :$retain, :$qos, :$packet-id);
+			@!queue.push: Packet::Publish.new(:$topic, :$payload, :$retain, :$qos, :$packet-id);
 			return self!add-follow-up($packet-id, $resend, $expiration);
 		}
 	}

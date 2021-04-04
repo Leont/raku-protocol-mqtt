@@ -2,7 +2,7 @@ Packet::Connect.new(
  :client-identifier<mosquitto_sub_10888>,
  :will(Message.new(
 	:topic<topic>,
-	:message(buf8.new('msg'.encode))
+	:payload(buf8.new('msg'.encode))
 	:qos(At-least-once),
 	:retain,
  )),

@@ -110,8 +110,8 @@ class MQTT::Client {
 
 	method !send-events(Instant $now --> Nil) {
 		$!cue.cancel with $!cue;
-		for $!client.next-events($now) -> $message {
-			$!connection.write: $message.encode;
+		for $!client.next-events($now) -> $packet {
+			$!connection.write: $packet.encode;
 		}
 		my $at = $!client.next-expiration;
 
@@ -119,10 +119,10 @@ class MQTT::Client {
 		$!cue = $at ?? $*SCHEDULER.cue($callback, :$at) !! Nil;
 	}
 
-	method publish(Str:D $topic, Str:D $message, Bool:D :$retain = False, Qos:D :$qos = At-most-once --> Promise:D) {
+	method publish(Str:D $topic, Str:D $payload, Bool:D :$retain = False, Qos:D :$qos = At-most-once --> Promise:D) {
 		my $now = now;
 		return Promise.broken('Invalid topic name') if $topic !~~ Topic;
-		my $result = $!client.publish($topic, $message.encode, $qos, $retain, now);
+		my $result = $!client.publish($topic, $payload.encode, $qos, $retain, now);
 		self!send-events($now);
 		return $result;
 	}
@@ -182,8 +182,8 @@ sub MAIN(Str $server = 'test.mosquitto.org',
 		}
 		whenever io-supply($*IN) {
 			when / ^ sub[scribe]? \s+ $<topic>=[\S+] / {
-				whenever $client.subscribe(~$<topic>, :$qos) -> (:$topic, :$message, :$qos, :$retain) {
-					say "$topic: {$message.decode('utf8-c8')}";
+				whenever $client.subscribe(~$<topic>, :$qos) -> (:$topic, :$payload, :$qos, :$retain) {
+					say "$topic: {$payload.decode('utf8-c8')}";
 				}
 			}
 			when / ^ unsub[scribe]? \s+ $<topic>=[\S+] / {
