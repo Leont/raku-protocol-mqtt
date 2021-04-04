@@ -155,11 +155,10 @@ class MQTT::Client {
 sub io-supply(IO::Handle $handle) {
 	my $supplier = Supplier.new;
 	start {
-		react {
-			whenever $*IN.Supply(:1size) -> $input {
-				$supplier.emit($input);
-			}
+		for $handle.lines -> $line {
+			$supplier.emit($line);
 		}
+		$supplier.done;
 	}
 	return $supplier.Supply;
 }
@@ -181,7 +180,7 @@ sub MAIN(Str $server = 'test.mosquitto.org',
 		whenever $client.disconnected -> $error {
 			say $error;
 		}
-		whenever io-supply($*IN).lines {
+		whenever io-supply($*IN) {
 			when / ^ sub[scribe]? \s+ $<topic>=[\S+] / {
 				whenever $client.subscribe(~$<topic>, :$qos) -> (:$topic, :$message, :$qos, :$retain) {
 					say "$topic: {$message.decode('utf8-c8')}";
@@ -220,6 +219,7 @@ sub MAIN(Str $server = 'test.mosquitto.org',
 			default {
 				say "Couldn't parse '$_'";
 			}
+			LAST { done }
 		}
 	}
 }
