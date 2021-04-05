@@ -39,6 +39,11 @@ my role Skip[Int $count = 1] {
 	}
 }
 
+my sub size-of-enum(Enumeration $enum) {
+	state Int %size_of{Enumeration:U};
+	return %size_of{$enum.WHAT} //= $enum.enums.keys.log2.ceiling;
+}
+
 my sub unpack-flags(Int $input, *@selectors) {
 	my $index = 0;
 	my @result;
@@ -47,14 +52,10 @@ my sub unpack-flags(Int $input, *@selectors) {
 			@result.push(?($input +& (1 +< $index)));
 			$index++;
 		}
-		when Qos {
-			my $mask = 3 +< $index;
-			@result.push: Qos(($input +& $mask) +> $index) // die Error::InvalidValue.new('Invalid qos');
+		when Enumeration {
+			my $mask = (1 +< size-of-enum($_)) - 1;
+			@result.push: $_(($input +> $index) +& $mask) // die Error::InvalidValue.new('Invalid ' ~ $_.^name);
 			$index += 2;
-		}
-		when ConnectStatus {
-			my $mask = 7 +< $index;
-			@result.push: ConnectStatus(($input +& $mask) +> $index) // die Error::InvalidValue.new('Invalid connect status');
 		}
 		when Skip {
 			$index += .count;
@@ -166,13 +167,9 @@ my sub pack-flags(*@values) {
 			$flag +|= $value +< $index;
 			$index++;
 		}
-		when $value ~~ Qos {
+		when $value ~~ Enumeration {
 			$flag +|= $value +< $index;
-			$index += 2;
-		}
-		when $value ~~ Type {
-			$flag +|= $value +< $index;
-			$index += 4;
+			$index += size-of-enum($value);
 		}
 		when $value ~~ Skip {
 			$index += $value.count;
