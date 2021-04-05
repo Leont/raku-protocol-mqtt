@@ -115,6 +115,25 @@ our class DecodeBuffer is export(:decoder) {
 	}
 }
 
+my sub pack-flags(*@values) {
+	my $flag = 0;
+	my $index = 0;
+	for @values -> $value {
+		when $value ~~ Bool {
+			$flag +|= $value +< $index;
+			$index++;
+		}
+		when $value ~~ Enumeration {
+			$flag +|= $value +< $index;
+			$index += size-of-enum($value);
+		}
+		when $value ~~ Skip {
+			$index += $value.count;
+		}
+	}
+	return $flag;
+}
+
 my class EncodeBuffer {
 	has buf8 $!buffer = buf8.new;
 	has Int $!offset = 0;
@@ -124,6 +143,9 @@ my class EncodeBuffer {
 		$!offset++;
 	}
 
+	method encode-byte-pack(*@values) {
+		self.encode-byte(pack-flags(|@values));
+	}
 	method encode-short(Short $short) {
 		$!buffer.write-uint16($!offset, $short, Endian::BigEndian);
 		$!offset += 2;
@@ -157,25 +179,6 @@ my class EncodeBuffer {
 	method Buf(--> Buf) {
 		return encode-length($!buffer.elems) ~ $!buffer;
 	}
-}
-
-my sub pack-flags(*@values) {
-	my $flag = 0;
-	my $index = 0;
-	for @values -> $value {
-		when $value ~~ Bool {
-			$flag +|= $value +< $index;
-			$index++;
-		}
-		when $value ~~ Enumeration {
-			$flag +|= $value +< $index;
-			$index += size-of-enum($value);
-		}
-		when $value ~~ Skip {
-			$index += $value.count;
-		}
-	}
-	return $flag;
 }
 
 our role Packet[Type $type, Qos $qos = At-most-once] is export(:packets :decoder) {
@@ -257,7 +260,7 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 	method !encode-body(Packet::Connect:D: EncodeBuffer $buffer) {
 		$buffer.encode-string($!protocol-name);
 		$buffer.encode-byte($!protocol-version);
-		$buffer.encode-byte(pack-flags(Skip, $!clean-start, ?$!will, $!will ?? $!will.qos !! At-most-once, $!will ?? $!will.retain !! False, $!password.defined, $!username.defined));
+		$buffer.encode-byte-pack(Skip, $!clean-start, ?$!will, $!will ?? $!will.qos !! At-most-once, $!will ?? $!will.retain !! False, $!password.defined, $!username.defined);
 		$buffer.encode-short($!keep-alive-interval);
 		$buffer.encode-string($!client-identifier);
 		with $!will {
@@ -285,8 +288,8 @@ our class Packet::ConnAck does Packet[Type::ConnAck] is export(:packets) {
 	}
 
 	method !encode-body(Packet::ConnAck:D: EncodeBuffer $buffer) {
-		$buffer.encode-byte(pack-flags($.session-acknowledge));
-		$buffer.encode-byte(+$.return-code);
+		$buffer.encode-byte-pack($.session-acknowledge);
+		$buffer.encode-byte-pack($.return-code);
 	}
 }
 
@@ -366,7 +369,7 @@ our class Packet::Subscribe does Packet[Type::Subscribe, At-least-once] does Pac
 		$buffer.encode-short($!packet-id);
 		for @!subscriptions -> $subscription {
 			$buffer.encode-string($subscription.topic);
-			$buffer.encode-byte(pack-flags($subscription.qos));
+			$buffer.encode-byte-pack($subscription.qos);
 		}
 	}
 }
