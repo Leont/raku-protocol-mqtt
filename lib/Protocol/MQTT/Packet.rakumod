@@ -24,6 +24,15 @@ my enum Type (
 	Disconnect  => 0xe,
 );
 
+our enum ConnectStatus is export(:packets) (
+	Accepted                              => 0,
+	Refused-unacceptable-protocol-version => 1,
+	Refused-identifier-rejected           => 2,
+	Refused-server-unavailable            => 3,
+	Refused-bad-user-name-or-password     => 4,
+	Refused-not-authorized                => 5,
+);
+
 my role Skip[Int $count = 1] {
 	method count() {
 		return $count;
@@ -42,6 +51,10 @@ my sub unpack-flags(Int $input, *@selectors) {
 			my $mask = 3 +< $index;
 			@result.push: Qos(($input +& $mask) +> $index) // die Error::InvalidValue.new('Invalid qos');
 			$index += 2;
+		}
+		when ConnectStatus {
+			my $mask = 7 +< $index;
+			@result.push: ConnectStatus(($input +& $mask) +> $index) // die Error::InvalidValue.new('Invalid connect status');
 		}
 		when Skip {
 			$index += .count;
@@ -260,14 +273,6 @@ our class Packet::Connect does Packet[Type::Connect] is export(:packets) {
 }
 
 our class Packet::ConnAck does Packet[Type::ConnAck] is export(:packets) {
-	our enum ConnectStatus (
-		Accepted                              => 0,
-		Refused-unacceptable-protocol-version => 1,
-		Refused-identifier-rejected           => 2,
-		Refused-server-unavailable            => 3,
-		Refused-bad-user-name-or-password     => 4,
-		Refused-not-authorized                => 5,
-	);
 
 	has Bool:D $.session-acknowledge = False;
 	has ConnectStatus:D $.return-code = Accepted;
@@ -278,7 +283,7 @@ our class Packet::ConnAck does Packet[Type::ConnAck] is export(:packets) {
 
 	method decode-body(Packet::ConnAck:U: DecodeBuffer $buffer, Int $) {
 		my ($session-acknowledge) = $buffer.unpack-byte(Bool);
-		my $return-code = ConnectStatus($buffer.decode-byte) orelse die Error::InvalidValue.new('Invalid connect status');
+		my ($return-code) = $buffer.unpack-byte(ConnectStatus);
 		return self.new(:$session-acknowledge, :$return-code);
 	}
 
