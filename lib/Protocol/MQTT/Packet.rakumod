@@ -277,10 +277,6 @@ our class Packet::ConnAck does Packet[Type::ConnAck] is export(:packets) {
 	has Bool:D $.session-acknowledge = False;
 	has ConnectStatus:D $.return-code = Accepted;
 
-	method success(--> Bool) {
-		return $!return-code === Accepted;
-	}
-
 	method decode-body(Packet::ConnAck:U: DecodeBuffer $buffer, Int $) {
 		my ($session-acknowledge) = $buffer.unpack-byte(Bool);
 		my ($return-code) = $buffer.unpack-byte(ConnectStatus);

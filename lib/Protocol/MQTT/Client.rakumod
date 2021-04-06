@@ -68,13 +68,13 @@ proto method received-packet(Packet:D, Instant $now) {
 	$!last-packet-received = $now;
 	{*}
 }
-multi method received-packet(Packet::ConnAck:D $packet, Instant $now --> Nil) {
-	if $packet.success {
+multi method received-packet(Packet::ConnAck:D (:$return-code, :$session-acknowledge), Instant $now --> Nil) {
+	if $return-code === Accepted {
 		$!state = Connected;
 		if $!keep-alive-interval {
 			$!next-expiration = $now + $!keep-alive-interval;
 		}
-		if $packet.session-acknowledge {
+		if $session-acknowledge {
 			for %!follow-ups.values -> $follow-up {
 				@!queue.push: $follow-up.packet;
 				$follow-up.expiration = $now + $!resend-interval;
@@ -94,11 +94,11 @@ multi method received-packet(Packet::ConnAck:D $packet, Instant $now --> Nil) {
 				return;
 			}
 		}
-		$!connect-promise.keep($packet.return-code);
+		$!connect-promise.keep($return-code);
 		$!connect-promise = Nil;
 	}
 	else {
-		$!disconnected.emit("Could not connect: " ~ $packet.return-code.subst('-', ' '));
+		$!disconnected.emit("Could not connect: " ~ $return-code.subst('-', ' '));
 	}
 }
 multi method received-packet(Packet::Publish:D (:$packet-id, :$topic, :$payload, :$qos, :$retain, :$dup), Instant $ --> Nil) {
