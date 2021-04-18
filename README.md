@@ -1,3 +1,5 @@
+[![Actions Status](https://github.com/Leont/raku-protocol-mqtt/workflows/test/badge.svg)](https://github.com/Leont/raku-protocol-mqtt/actions)
+
 NAME
 ====
 
