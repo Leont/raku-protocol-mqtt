@@ -5,7 +5,6 @@ unit class Net::MQTT;
 use Protocol::MQTT::Client :state;
 use Protocol::MQTT::Message;
 use Protocol::MQTT::PacketBuffer;
-use Protocol::MQTT::Subsets;
 use Protocol::MQTT::Qos :qos;
 
 has IO::Socket::Async:U $!connection-class;
@@ -35,7 +34,6 @@ submethod BUILD(
 	Str   :password($password-string),
 	Protocol::MQTT::Message :$will;
 	) {
-	die 'Oversized keep-alive interval' if $keep-alive-interval !~~ Short;
 
 	my Blob $password = $password-string.defined ?? $password-string.encode !! Nil;
 	$!client = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval, :$!connect-interval, :$username, :$password, :$will);
@@ -118,7 +116,6 @@ method !send-events(Instant $now --> Nil) {
 
 method publish(Str:D $topic, Str:D $payload, Bool:D :$retain = False, Qos:D :$qos = At-most-once --> Promise:D) {
 	my $now = now;
-	return Promise.broken('Invalid topic name') if $topic !~~ Topic;
 	my $result = $!client.publish($topic, $payload.encode, $qos, $retain, now);
 	self!send-events($now);
 	return $result;

@@ -6,6 +6,7 @@ use Protocol::MQTT::Dispatcher;
 use Protocol::MQTT::Message :message;
 use Protocol::MQTT::Packet :packets;
 use Protocol::MQTT::Qos :qos;
+use Protocol::MQTT::Subsets;
 
 our enum ConnState is export(:state) <Disconnected Unconnected Connecting Connected Disconnecting>;
 
@@ -39,6 +40,9 @@ has FollowUp    %!follow-ups handles(:pending-acknowledgements<elems>);
 has Bool        %!blocked;
 has Qos         %!qos-for;
 
+submethod TWEAK(:$!keep-alive-interval) {
+	die 'Oversized keep-alive interval' if $!keep-alive-interval !~~ Short;
+}
 
 method generate-identifier(:$prefix = 'raku-', :$length = 8, :@charset = 'a' .. 'z') {
 	return $prefix ~ @charset.roll($length).join('');
@@ -206,6 +210,7 @@ method !next-id(--> Int:D) {
 }
 
 method publish(Str:D $topic, Blob:D $payload, Qos:D $qos, Bool:D $retain, Instant:D $now --> Promise:D) {
+	return Promise.broken('Invalid topic name') if $topic !~~ Topic;
 	given $qos {
 		when At-most-once {
 			@!queue.push: Packet::Publish.new(:$topic, :$payload, :$retain, :$qos);
