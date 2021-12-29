@@ -1,6 +1,6 @@
 use v6.d;
 
-unit class Protocol::MQTT::Client:ver<0.0.1>:auth<cpan:LEONT>;
+unit class Protocol::MQTT::Client:ver<0.0.2>:auth<cpan:LEONT>;
 
 use Protocol::MQTT::Dispatcher;
 use Protocol::MQTT::Message :message;
