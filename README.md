@@ -15,7 +15,7 @@ use Protocol::MQTT;
 DESCRIPTION
 ===========
 
-Protocol::MQTT is ...
+Protocol::MQTT contains a networking and timing independent implementation of the MQTT protocol. Currently only the client side is implemented, in the form of [Protocol::MQTT::Client](Protocol::MQTT::Client). [Net::MQTT](Net::MQTT) an actual client based on `Protocol::MQTT::Client`.
 
 AUTHOR
 ======

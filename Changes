@@ -1,6 +1,7 @@
 Revision history for Protocol-MQTT
 
 {{$NEXT}}
+    - Updated documentation
 
 0.0.1  2021-04-18T12:18:54+02:00
     - Initial version

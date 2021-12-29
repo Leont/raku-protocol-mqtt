@@ -259,3 +259,125 @@ method disconnect(--> Nil) {
 		}
 	}
 }
+
+=begin pod
+
+=NAME Protocol::MQTT::Client
+
+=head1 SYNOPSIS
+
+=begin code
+my $client = Net::MQTT.new(:server<localhost>);
+react {
+	whenever $client.subscribe('raku/updates/#') -> $update {
+		say "{$update.topic}: {$update.payload.decode('utf8-c8')}";
+	}
+	whenever Supply.interval(20) {
+		$client.publish('time/now', "Current time is {Datetime.now}", :retain);
+	}
+	whenever $client.connected {
+		say "Connected";
+		LAST { done }
+	}
+}
+=end code
+
+=head1 DESCRIPTION
+
+C<Protocol::MQTT::Client> is a network and time independent implementation of a MQTT client.
+
+=head1 METHODS
+
+=head2 new(*%args)
+
+This creates a new mqtt client. It takes the follow arguments, all are optional:
+
+=begin item1
+Str :$client-identifier
+
+An unique identifier for this client/session. If none is given a random identifier will be generated.
+=end item1
+
+=begin item1
+Int :$keep-alive-interval
+
+This sets the keep-alive interval (in seconds). This defaults to C<60>.
+=end item1
+
+=begin item1
+Int :$resend-interval
+
+This sets the resend interval (in seconds). This defaults to C<5>.
+=end item1
+
+=begin item1
+Int :$connect-interval
+
+This sets the connect interval. It defaults to the resend interval.
+=end item1
+
+=begin item1
+Int :$reconnect-attempts
+
+This sets how many times it will try to (re)connect before giving up. This defaults to C<3>.
+=end item1
+
+=begin item1
+Str :$username
+
+This sets the username, if any.
+=end item1
+
+=begin item1
+Blob :$password
+
+This sets the password, if any.
+=end item1
+
+=begin item1
+Protocol::MQTT::Message :$will
+
+This is the will of the connection. If the connection is lost without a formal disconnect, the server will send this message as if the client sent it.
+=end item1
+
+=head2 next-events(Instant $now -> List:D)
+
+This returns a list of packets to be sent over the connection. This B<must> be called after any method that changes (C<connect>, C<disconnect>, C<publish>, C<subscribe>, C<unsubscribe>, C<received-packet>), or when C<next-expiration> times out.
+
+=head2 connect()
+
+This changes the state to connecting.
+
+=head2 disconnect(--> Nil)
+
+This marks the connection for disconnecting.
+
+=head2 publish(Str:D $topic, Blob:D $payload, Qos:D $quality-of-service, Bool:D $retainedness, Instant:D $now --> Promise:D)
+
+This publishes C<$payload> to C<$topic>, with the specified C<$quality-of-service> and C<$retainedness>. The resulting promise will succeed when the QOS requirements are met (or fail if the connection is lost before that happens).
+
+=head2 subscribe(Str:D $topic, Qos:D $qos, Instant:D $now --> Promise:D)
+
+This subscribes to a specific topic with messages being sent using the specified quality-of-service. The messages will be posted on the C<incoming> C<Supply>.
+
+=head2 unsubscribe(Str:D $topic, Instant:D $now --> Promise:D)
+
+This unsubscribes from a C<$topic>.
+
+=head2 received-packet(Protocol::MQTT::Packet $packet, Instant $now)
+
+This should be called with every incoming C<Packet>. Turning a data-stream into packets is done using L<Protocol::MQTT::PacketBuffer|Protocol::MQTT::PacketBuffer>.
+
+=head2 next-expiration(--> Instant:D)
+
+This returns the next C<Instant> when current outstanding message expire and hence C<next-events> should be called again, if any.
+
+=head2 incoming(--> Supply:D)
+
+This returns the supply of Protocol::MQTT::Message objects that have been received from the server.
+
+=head2 disconnected(--> Promise:D)
+
+This promise will succeed whenever the connection is lost (connecting failed, or we failed to receive keep-alives for too long).
+
+=end pod

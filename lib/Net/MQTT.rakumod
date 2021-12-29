@@ -267,5 +267,8 @@ This supply will emit a value whenever a connection has been established. It wil
 
 This supply will emit a value whenever a connection has been lost.
 
-=end pod
+=head1 DEPENDENCIES
 
+This module has an optional dependency on L<IO::Socket::Async::SSL|IO::Socket::Async::SSL> for TLS support.
+
+=end pod

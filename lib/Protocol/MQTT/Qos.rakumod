@@ -8,3 +8,21 @@ our enum Qos is export(:qos) (
 	Exactly-once  => 0x2,
 );
 
+=begin pod
+
+=NAME Protocol::MQTT::Qos
+
+=head1 DESCRIPTION
+
+This defines an enum with three possible values:
+
+=defn C<At-most-once>
+Messages are delivered according to the best efforts of the operating environment. Message loss can occur. This level could be used, for example, with ambient sensor data where it does not matter if an individual reading is lost as the next one will be published soon after.
+
+=defn C<At-least-once>
+Messages are assured to arrive but duplicates can occur.
+
+=defn C<Exactly-once>
+Message are assured to arrive exactly once. This level could be used, for example, with billing systems where duplicate or lost messages could lead to incorrect charges being applied.
+
+=end pod

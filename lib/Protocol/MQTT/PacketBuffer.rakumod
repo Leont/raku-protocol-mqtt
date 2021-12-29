@@ -76,3 +76,45 @@ our class PacketBuffer is export(:decoder) {
 		}
 	}
 }
+
+=begin pod
+
+=NAME Protocol::MQTT::PacketBuffer
+
+=head1 SYNOPSIS
+
+=begin code
+
+my $decoder = Protocol::MQTT::PacketBuffer.new;
+while $data.read -> $data {
+	$decoder.add-data($data);
+	while $decoder.get-packet -> $packet {
+		...
+	}
+}
+
+=end code
+
+=head1 DESCRIPTION
+
+C<Protocol::MQTT::PacketBuffer> is a network and time independent implementation of a MQTT client.
+
+=head1 METHODS
+
+=head2 new(buf8 :$buffer?)
+
+This creates a new packet buffer, optionally starting with C<$buffer> as initial value.
+
+=head2 add-data(Blob[uint8] $data --> Nil)
+
+This adds C<$data> to the buffer.
+
+=head2 has-packet(--> Bool)
+
+This returns true if the buffer contains at least one full packet.
+
+=head2 get-packet(--> Packet)
+
+Decode the next message out of the buffer, if any.
+
+=end pod
