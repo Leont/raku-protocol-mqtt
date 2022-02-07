@@ -65,7 +65,7 @@ sub to-hex(buf8 $buffer) {
 	my Str $result = '';
 
 	for ^$buffer.elems -> $pos {
-		my int $byte = $buffer[$pos];
+		my uint8 $byte = $buffer[$pos];
 		$result ~= ($byte +> 4).fmt("%x") ~ ($byte % 16).fmt("%x");
 	}
 	return $result;
