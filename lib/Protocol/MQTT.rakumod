@@ -6,7 +6,7 @@ unit package Protocol::MQTT:ver<0.0.1>:auth<cpan:LEONT>;
 
 =head1 NAME
 
-Protocol::MQTT - blah blah blah
+Protocol::MQTT -  A (sans-io) MQTT client implementation
 
 =head1 SYNOPSIS
 
