@@ -5,7 +5,7 @@
   ],
   "build-depends" : [ ],
   "depends" : [ ],
-  "description" : "blah blah blah",
+  "description" : "A (sans-io) MQTT client implementation",
   "license" : "Artistic-2.0",
   "name" : "Protocol::MQTT",
   "perl" : "6.d",

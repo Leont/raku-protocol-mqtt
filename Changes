@@ -2,6 +2,9 @@ Revision history for Protocol-MQTT
 
 {{$NEXT}}
 
+0.0.3  2022-02-07T23:40:15+01:00
+    - Fix for stricter int/uint distinction in rakudo
+
 0.0.2  2021-12-29T14:05:30+01:00
     - Updated documentation
 

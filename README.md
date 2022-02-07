@@ -3,7 +3,7 @@
 NAME
 ====
 
-Protocol::MQTT - blah blah blah
+Protocol::MQTT - A (sans-io) MQTT client implementation
 
 SYNOPSIS
 ========
