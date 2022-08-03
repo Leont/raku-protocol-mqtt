@@ -4,8 +4,7 @@ use v6.d;
 
 use Test;
 
-use Protocol::MQTT::Dispatcher;
-use Protocol::MQTT::Message :message;
+use Protocol::MQTT;
 
 subtest 'First', {
 	my $dispatcher = Protocol::MQTT::Dispatcher.new;

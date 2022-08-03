@@ -2,10 +2,7 @@ use v6.d;
 
 unit class Net::MQTT;
 
-use Protocol::MQTT::Client :state;
-use Protocol::MQTT::Message;
-use Protocol::MQTT::PacketBuffer;
-use Protocol::MQTT::Qos :qos;
+use Protocol::MQTT :state, :qos;
 
 has IO::Socket::Async:U $!connection-class;
 has IO::Socket::Async $!connection;

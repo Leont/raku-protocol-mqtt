@@ -5,11 +5,7 @@ use v6.d;
 use Test;
 use fatal;
 
-use Protocol::MQTT::Error;
-use Protocol::MQTT::Message :message;
-use Protocol::MQTT::Packet :packets;
-use Protocol::MQTT::PacketBuffer;
-use Protocol::MQTT::Qos :qos;
+use Protocol::MQTT :qos;
 
 my $dir = 't/messages'.IO;
 for $dir.dir.sort -> $filename {

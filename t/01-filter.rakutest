@@ -1,7 +1,7 @@
 #! raku
 use v6;
 use Test;
-use Protocol::MQTT::Filter;
+use Protocol::MQTT;
 
 sub far(Str $topic) {
 	return Protocol::MQTT::Filter.new(:$topic);

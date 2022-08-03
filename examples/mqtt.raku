@@ -2,7 +2,7 @@
 
 use Getopt::Long;
 use Net::MQTT;
-use Protocol::MQTT::Qos :qos;
+use Protocol::MQTT :qos;
 
 sub io-supply(IO::Handle $handle) {
 	my $supplier = Supplier.new;

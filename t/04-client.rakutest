@@ -4,10 +4,7 @@ use v6.d;
 
 use Test;
 
-use Protocol::MQTT::Client :state;
-use Protocol::MQTT::Message :message;
-use Protocol::MQTT::Packet :packets;
-use Protocol::MQTT::Qos :qos;
+use Protocol::MQTT :qos;
 
 my $client-identifier = 'Test';
 my $keep-alive-interval = 30;
