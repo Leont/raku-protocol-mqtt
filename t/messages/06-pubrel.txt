@@ -1,3 +1,3 @@
-Packet::PubRel.new(:1234packet-id)
+Protocol::MQTT::Packet::PubRel.new(:1234packet-id)
 
 62 02 04d2

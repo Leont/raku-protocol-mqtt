@@ -1,4 +1,4 @@
-Packet::Publish.new(
+Protocol::MQTT::Packet::Publish.new(
  :qos(Exactly-once),
  :topic<testing>,
  :payload(buf8('test'.encode)),

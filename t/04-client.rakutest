@@ -17,20 +17,20 @@ my $client = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interv
 my $now = now;
 
 subtest 'Connecting', {
-	is($client.state, Disconnected, 'state=Disconnected');
+	is($client.state, Protocol::MQTT::Disconnected, 'state=Disconnected');
 	my $promise = $client.connect;
-	is($client.state, Unconnected, 'state=Unconnected');
+	is($client.state, Protocol::MQTT::Unconnected, 'state=Unconnected');
 	is($promise.status, Planned, 'Promise is planned');
 	$now++;
 	my @messages = $client.next-events($now);
-	is($client.state, Connecting, 'state=Connecting');
+	is($client.state, Protocol::MQTT::Connecting, 'state=Connecting');
 	is(+@messages, 1, 'Sending one message');
 	is($promise.status, Planned, 'Promise is stil planned');
-	is-deeply(@messages[0], Packet::Connect.new(:$client-identifier, :$keep-alive-interval), 'Packet is as expected');
+	is-deeply(@messages[0], Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval), 'Packet is as expected');
 
-	$client.received-packet(Packet::ConnAck.new, $now + 1);
+	$client.received-packet(Protocol::MQTT::Packet::ConnAck.new, $now + 1);
 	is($promise.status, Kept, 'Promise is kept');
-	is($client.state, Connected, 'state=Connected');
+	is($client.state, Protocol::MQTT::Connected, 'state=Connected');
 }
 
 subtest 'Sending Qos=At-most-once', {
@@ -42,7 +42,7 @@ subtest 'Sending Qos=At-most-once', {
 	my @messages = $client.next-events($now);
 	is(+@messages, 1, 'Sending one message');
 
-	is-deeply(@messages[0], Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-most-once), :!retain, :!dup), 'Packet is as expected');
+	is-deeply(@messages[0], Protocol::MQTT::Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-most-once), :!retain, :!dup), 'Packet is as expected');
 
 	is($client.next-expiration, $now + $keep-alive-interval, 'Next expiration at keep-alive');
 }
@@ -59,10 +59,10 @@ subtest 'Sending Qos=At-least-once', {
 		is(+@messages, 1, 'Sending one message (1)');
 
 		given @messages[0] -> $message {
-			isa-ok($message, Packet::Publish);
+			isa-ok($message, Protocol::MQTT::Packet::Publish);
 			$packet-id = $message.packet-id;
 			ok($packet-id, 'Packet id is present');
-			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-least-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
+			is-deeply($message, Protocol::MQTT::Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-least-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
 		}
 
 		is($client.next-expiration, $now + $resend-interval, 'Next expiration is at resend');
@@ -78,9 +78,9 @@ subtest 'Sending Qos=At-least-once', {
 		my @messages = $client.next-events($now);
 		is(+@messages, 1, 'Got one message (2)');
 		given @messages[0] -> $message {
-			isa-ok($message, Packet::Publish, 'Packet is a publish');
+			isa-ok($message, Protocol::MQTT::Packet::Publish, 'Packet is a publish');
 			is($message.packet-id, $packet-id, 'Packet id has expected value');
-			my $expected = Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-least-once), :!retain, :dup, :$packet-id);
+			my $expected = Protocol::MQTT::Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(At-least-once), :!retain, :dup, :$packet-id);
 			is-deeply($message, $expected, 'Packet is as expected');
 		}
 
@@ -90,7 +90,7 @@ subtest 'Sending Qos=At-least-once', {
 
 	subtest 'Receive Acknowledgement', {
 		$now++;
-		$client.received-packet(Packet::PubAck.new(:$packet-id), $now);
+		$client.received-packet(Protocol::MQTT::Packet::PubAck.new(:$packet-id), $now);
 		my @messages3 = $client.next-events($now);
 		is(+@messages3, 0, 'Got no messages');
 
@@ -110,10 +110,10 @@ subtest 'Sending Qos=Exactly-once', {
 		is(+@messages, 1, 'Sending one message');
 
 		given @messages[0] -> $message {
-			isa-ok($message, Packet::Publish);
+			isa-ok($message, Protocol::MQTT::Packet::Publish);
 			$packet-id = $message.packet-id;
 			ok($packet-id, 'Packet id is present');
-			is-deeply($message, Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(Exactly-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
+			is-deeply($message, Protocol::MQTT::Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(Exactly-once), :!retain, :!dup, :$packet-id), 'Packet is as expected');
 		}
 
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
@@ -128,9 +128,9 @@ subtest 'Sending Qos=Exactly-once', {
 		my @messages = $client.next-events($now);
 		is(+@messages, 1, 'Sending one message');
 		given @messages[0] -> $message {
-			isa-ok($message, Packet::Publish, 'Packet is a publish');
+			isa-ok($message, Protocol::MQTT::Packet::Publish, 'Packet is a publish');
 			is($message.packet-id, $packet-id, 'Packet id has expected value');
-			my $expected = Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(Exactly-once), :!retain, :dup, :$packet-id);
+			my $expected = Protocol::MQTT::Packet::Publish.new(:topic<foo/bar>, :payload('whatever'.encode), :qos(Exactly-once), :!retain, :dup, :$packet-id);
 			is-deeply($message, $expected, 'Packet is as expected');
 		}
 
@@ -139,11 +139,11 @@ subtest 'Sending Qos=Exactly-once', {
 
 	subtest 'Receive record, send release', {
 		$now++;
-		$client.received-packet(Packet::PubRec.new(:$packet-id), $now);
+		$client.received-packet(Protocol::MQTT::Packet::PubRec.new(:$packet-id), $now);
 
 		my @messages = $client.next-events($now);
 		is(+@messages, 1, 'Sending 1 message');
-		is-deeply(@messages[0], Packet::PubRel.new(:$packet-id), 'PubRel is as expected');
+		is-deeply(@messages[0], Protocol::MQTT::Packet::PubRel.new(:$packet-id), 'PubRel is as expected');
 
 		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
@@ -154,12 +154,12 @@ subtest 'Sending Qos=Exactly-once', {
 
 		my @messages = $client.next-events($now);
 		is(+@messages, 1, 'Sending 1 message');
-		is-deeply(@messages[0], Packet::PubRel.new(:$packet-id), 'PubRel is as expected');
+		is-deeply(@messages[0], Protocol::MQTT::Packet::PubRel.new(:$packet-id), 'PubRel is as expected');
 
 		is($client.pending-acknowledgements, 1, 'Has 1 pending message');
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
 
-		$client.received-packet(Packet::PubComp.new(:$packet-id), $now);
+		$client.received-packet(Protocol::MQTT::Packet::PubComp.new(:$packet-id), $now);
 
 		is($client.pending-acknowledgements, 0, 'Has no pending message');
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
@@ -188,7 +188,7 @@ subtest 'Receiving Qos=At-most-once', {
 		is(+@messages, 1, 'Expecting one packet');
 		given @messages[0] -> $message {
 			$packet-id = $message.packet-id;
-			is-deeply($message, Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
+			is-deeply($message, Protocol::MQTT::Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
 		}
 
 		is-deeply($client.next-events($now), [], 'No events expected');
@@ -198,12 +198,12 @@ subtest 'Receiving Qos=At-most-once', {
 		$now += $resend-interval + 1;
 		my @messages = $client.next-events($now);
 		is(+@messages, 1, 'Expecting one packet');
-		is-deeply(@messages[0], Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
+		is-deeply(@messages[0], Protocol::MQTT::Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
 	}
 
 	subtest 'Subscription acknowledged', {
 		$now++;
-		$client.received-packet(Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
+		$client.received-packet(Protocol::MQTT::Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
 		
 		$now += $resend-interval + 1;
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
@@ -211,21 +211,21 @@ subtest 'Receiving Qos=At-most-once', {
 
 	subtest 'First message', {
 		$now++;
-		$client.received-packet(Packet::Publish.new(:2packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:2packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [], 'No events expected');
 
 		is(+@all, 1, 'Received first publish');
-		is-deeply(@all[0], Message.new(:topic<foo>, :payload('Hello world'.encode)), 'publish is "Hello world"');
+		is-deeply(@all[0], Protocol::MQTT::Message.new(:topic<foo>, :payload('Hello world'.encode)), 'publish is "Hello world"');
 	}
 
 	subtest 'Second message', {
 		$now++;
 
-		$client.received-packet(Packet::Publish.new(:3packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:3packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
 		is-deeply($client.next-events($now), [], 'No events expected');
 
 		is(+@all, 2, 'Received second publish');
-		is-deeply(@all[1], Message.new(:topic<foo>, :payload('Hello again'.encode)), 'publish is "Hello again"');
+		is-deeply(@all[1], Protocol::MQTT::Message.new(:topic<foo>, :payload('Hello again'.encode)), 'publish is "Hello again"');
 	}
 }
 
@@ -247,7 +247,7 @@ subtest 'Receiving Qos=At-least-once', {
 		is(+@messages, 1, 'Expecting one packet');
 		given @messages[0] -> $message {
 			$packet-id = $message.packet-id;
-			is-deeply($message, Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
+			is-deeply($message, Protocol::MQTT::Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
 		}
 
 		is-deeply($client.next-events($now), [], 'No events expected');
@@ -257,12 +257,12 @@ subtest 'Receiving Qos=At-least-once', {
 		$now += $resend-interval + 1;
 		my @messages = $client.next-events($now);
 		is(+@messages, 1, 'Expecting one packet');
-		is-deeply(@messages[0], Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
+		is-deeply(@messages[0], Protocol::MQTT::Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
 	}
 
 	subtest 'Subscription acknowledged', {
 		$now++;
-		$client.received-packet(Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
+		$client.received-packet(Protocol::MQTT::Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
 
 		$now += $resend-interval + 1;
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
@@ -270,21 +270,21 @@ subtest 'Receiving Qos=At-least-once', {
 
 	subtest 'First message', {
 		$now++;
-		$client.received-packet(Packet::Publish.new(:5packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
-		is-deeply($client.next-events($now), [ Packet::PubAck.new(:5packet-id) ], 'Packet triggers ack');
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:5packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Protocol::MQTT::Packet::PubAck.new(:5packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 1, 'Received first publish');
-		is-deeply(@all[0], Message.new(:topic<foo>, :payload('Hello world'.encode), :qos(At-least-once)), 'publish is "Hello world"');
+		is-deeply(@all[0], Protocol::MQTT::Message.new(:topic<foo>, :payload('Hello world'.encode), :qos(At-least-once)), 'publish is "Hello world"');
 	}
 
 	subtest 'Second message', {
 		$now++;
 
-		$client.received-packet(Packet::Publish.new(:6packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
-		is-deeply($client.next-events($now), [ Packet::PubAck.new(:6packet-id) ], 'Packet triggers ack');
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:6packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Protocol::MQTT::Packet::PubAck.new(:6packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 2, 'Received second publish');
-		is-deeply(@all[1], Message.new(:topic<foo>, :payload('Hello again'.encode), :qos(At-least-once)), 'publish is "Hello again"');
+		is-deeply(@all[1], Protocol::MQTT::Message.new(:topic<foo>, :payload('Hello again'.encode), :qos(At-least-once)), 'publish is "Hello again"');
 	}
 }
 
@@ -306,7 +306,7 @@ subtest 'Receiving Qos=Exactly-once', {
 		is(+@messages, 1, 'Expecting one packet');
 		given @messages[0] -> $message {
 			$packet-id = $message.packet-id;
-			is-deeply($message, Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
+			is-deeply($message, Protocol::MQTT::Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Sent subscription is as expected');
 		}
 
 		is-deeply($client.next-events($now), [], 'No events expected');
@@ -316,12 +316,12 @@ subtest 'Receiving Qos=Exactly-once', {
 		$now += $resend-interval + 1;
 		my @messages = $client.next-events($now);
 		is(+@messages, 1, 'Expecting one packet');
-		is-deeply(@messages[0], Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
+		is-deeply(@messages[0], Protocol::MQTT::Packet::Subscribe.new(:$topic, :$qos, :$packet-id), 'Resent subscription is as expected');
 	}
 
 	subtest 'Subscription acknowledged', {
 		$now++;
-		$client.received-packet(Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
+		$client.received-packet(Protocol::MQTT::Packet::SubAck.new(:$packet-id, :qos-levels[ $qos ]), $now);
 
 		$now += $resend-interval + 1;
 		is-deeply($client.next-events($now + 1), [], 'No events expected');
@@ -329,21 +329,21 @@ subtest 'Receiving Qos=Exactly-once', {
 
 	subtest 'First message', {
 		$now++;
-		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
-		is-deeply($client.next-events($now), [ Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Protocol::MQTT::Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 1, 'Received first publish');
-		is-deeply(@all[0], Message.new(:topic<foo>, :payload('Hello world'.encode), :qos(Exactly-once)), 'publish is "Hello world"');
+		is-deeply(@all[0], Protocol::MQTT::Message.new(:topic<foo>, :payload('Hello world'.encode), :qos(Exactly-once)), 'publish is "Hello world"');
 
-		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
-		is-deeply($client.next-events($now), [ Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Protocol::MQTT::Packet::PubRec.new(:8packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 1, 'Ignored repeat of publish');
 
-		$client.received-packet(Packet::PubRel.new(:8packet-id), $now);
-		is-deeply($client.next-events($now), [ Packet::PubComp.new(:8packet-id) ], 'Release trigger Complete');
+		$client.received-packet(Protocol::MQTT::Packet::PubRel.new(:8packet-id), $now);
+		is-deeply($client.next-events($now), [ Protocol::MQTT::Packet::PubComp.new(:8packet-id) ], 'Release trigger Complete');
 
-		$client.received-packet(Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :qos(At-most-once)), $now);
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:8packet-id, :topic<foo>, :payload('Hello world'.encode), :qos(At-most-once)), $now);
 
 		is(+@all, 2, 'After PubComp, packet-id may be used again');
 	}
@@ -351,14 +351,14 @@ subtest 'Receiving Qos=Exactly-once', {
 	subtest 'Second message', {
 		$now++;
 
-		$client.received-packet(Packet::Publish.new(:9packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
-		is-deeply($client.next-events($now), [ Packet::PubRec.new(:9packet-id) ], 'Packet triggers ack');
+		$client.received-packet(Protocol::MQTT::Packet::Publish.new(:9packet-id, :topic<foo>, :payload('Hello again'.encode), :$qos), $now);
+		is-deeply($client.next-events($now), [ Protocol::MQTT::Packet::PubRec.new(:9packet-id) ], 'Packet triggers ack');
 
 		is(+@all, 3, 'Received second publish');
-		is-deeply(@all[2], Message.new(:topic<foo>, :payload('Hello again'.encode), :qos(Exactly-once)), 'publish is "Hello again"');
+		is-deeply(@all[2], Protocol::MQTT::Message.new(:topic<foo>, :payload('Hello again'.encode), :qos(Exactly-once)), 'publish is "Hello again"');
 
-		$client.received-packet(Packet::PubRel.new(:9packet-id), $now);
-		is-deeply($client.next-events($now), [ Packet::PubComp.new(:9packet-id) ], 'Release trigger Complete');
+		$client.received-packet(Protocol::MQTT::Packet::PubRel.new(:9packet-id), $now);
+		is-deeply($client.next-events($now), [ Protocol::MQTT::Packet::PubComp.new(:9packet-id) ], 'Release trigger Complete');
 	}
 }
 
@@ -368,68 +368,68 @@ subtest 'Disconnect', {
 	$client2.connect;
 	$client2.next-events($now);
 	$now++;
-	$client2.received-packet(Packet::ConnAck.new, $now);
-	is($client2.state, Connected, 'We are connected');
+	$client2.received-packet(Protocol::MQTT::Packet::ConnAck.new, $now);
+	is($client2.state, Protocol::MQTT::Connected, 'We are connected');
 
 	$client2.disconnect;
-	is-deeply($client2.next-events($now), [ Packet::Disconnect.new ], 'Sending a disconnect');
+	is-deeply($client2.next-events($now), [ Protocol::MQTT::Packet::Disconnect.new ], 'Sending a disconnect');
 }
 
 subtest 'Timeout', {
 	$now++;
-	is($client.state, Connected, 'We are still connected');
+	is($client.state, Protocol::MQTT::Connected, 'We are still connected');
 
 	$now += 2 * $keep-alive-interval;
 	is-deeply($client.next-events($now), [], 'No more events');
-	is($client.state, Disconnected, 'We ware now disconnected');
+	is($client.state, Protocol::MQTT::Disconnected, 'We ware now disconnected');
 }
 
 subtest 'Connect timeout', {
 	$now++;
 	my $client3 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
-	is($client3.state, Disconnected, 'State starts as disconnected');
+	is($client3.state, Protocol::MQTT::Disconnected, 'State starts as disconnected');
 	my $promise = $client3.connect;
 	is($promise.status, Planned, 'Promise is planned');
-	is($client3.state, Unconnected, 'State starts as unconnected');
-	is-deeply($client3.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
-	is($client3.state, Connecting, 'state is connected after sending connect package');
+	is($client3.state, Protocol::MQTT::Unconnected, 'State starts as unconnected');
+	is-deeply($client3.next-events($now), [ Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
+	is($client3.state, Protocol::MQTT::Connecting, 'state is connected after sending connect package');
 	$now += $resend-interval + 1;
 	is-deeply($client3.next-events($now), [], 'Don\'t have packets after connect timeout');
-	is($client3.state, Unconnected, 'Unconnected after connect timeout');
+	is($client3.state, Protocol::MQTT::Unconnected, 'Unconnected after connect timeout');
 	is($promise.status, Planned, 'Promise is planned');
 	$client3.disconnect;
 	is-deeply($client3.next-events($now), [], 'Don\'t have packets after disconnect');
-	is($client3.state, Disconnected, 'Unconnected after disconnect');
+	is($client3.state, Protocol::MQTT::Disconnected, 'Unconnected after disconnect');
 	is($promise.status, Broken, 'Promise is broken');
 }
 
 subtest 'Reconnect', {
 	my $client4 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
-	is($client4.state, Disconnected, 'We are connected');
+	is($client4.state, Protocol::MQTT::Disconnected, 'We are connected');
 	$client4.connect;
-	is($client4.state, Unconnected, 'State starts as unconnected');
-	is-deeply($client4.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
-	$client4.received-packet(Packet::ConnAck.new, $now);
-	is($client4.state, Connected, 'We are connected');
+	is($client4.state, Protocol::MQTT::Unconnected, 'State starts as unconnected');
+	is-deeply($client4.next-events($now), [ Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
+	$client4.received-packet(Protocol::MQTT::Packet::ConnAck.new, $now);
+	is($client4.state, Protocol::MQTT::Connected, 'We are connected');
 	$now++;
 	my $supply = $client4.subscribe('foo/bar', At-most-once, $now);
 	my @messages = $client4.next-events($now);
 	is(+@messages, 1, 'Sending one message');
-	isa-ok(@messages[0], Packet::Subscribe, 'Message is a Subscribe');
-	$client4.received-packet(Packet::SubAck.new(:packet-id(@messages[0].packet-id)), $now);
+	isa-ok(@messages[0], Protocol::MQTT::Packet::Subscribe, 'Message is a Subscribe');
+	$client4.received-packet(Protocol::MQTT::Packet::SubAck.new(:packet-id(@messages[0].packet-id)), $now);
 	my $packet-id = @messages[0].packet-id;
 
 	my $promise = $client4.connect;
 	is($promise.status, Planned, 'Promise is planned');
 	$now++;
 
-	is($client4.state, Unconnected, 'We are connected');
-	is-deeply($client4.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
-	$client4.received-packet(Packet::ConnAck.new, $now);
-	is($client4.state, Connected, 'We are connected');
+	is($client4.state, Protocol::MQTT::Unconnected, 'We are connected');
+	is-deeply($client4.next-events($now), [ Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
+	$client4.received-packet(Protocol::MQTT::Packet::ConnAck.new, $now);
+	is($client4.state, Protocol::MQTT::Connected, 'We are connected');
 	my @messages2 = $client4.next-events($now);
 	is(+@messages2, 1, 'Sending one message again');
-	is-deeply(@messages2[0].subscriptions.list, Array[Packet::Subscribe::Subscription].new(Packet::Subscribe::Subscription.new(:topic<foo/bar>, :qos(At-most-once))), 'Subscribe resend is as expected');
+	is-deeply(@messages2[0].subscriptions.list, Array[Protocol::MQTT::Packet::Subscribe::Subscription].new(Packet::Subscribe::Subscription.new(:topic<foo/bar>, :qos(At-most-once))), 'Subscribe resend is as expected');
 }
 
 subtest 'Persistent reconnect', {
@@ -438,28 +438,28 @@ subtest 'Persistent reconnect', {
 	my $qos = At-least-once;
 	my $client5 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval, :persistent-session);
 	$client5.connect;
-	is($client5.state, Unconnected, 'We are connected');
-	is-deeply($client5.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
-	$client5.received-packet(Packet::ConnAck.new, $now);
-	is($client5.state, Connected, 'We are connected');
+	is($client5.state, Protocol::MQTT::Unconnected, 'We are connected');
+	is-deeply($client5.next-events($now), [ Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
+	$client5.received-packet(Protocol::MQTT::Packet::ConnAck.new, $now);
+	is($client5.state, Protocol::MQTT::Connected, 'We are connected');
 	$now++;
 	my $supply = $client5.publish($topic, $payload, $qos, False, $now);
 	my @messages = $client5.next-events($now);
 	is(+@messages, 1, 'Sending one message');
-	isa-ok(@messages[0], Packet::Publish, 'Message is a Publish');
+	isa-ok(@messages[0], Protocol::MQTT::Packet::Publish, 'Message is a Publish');
 	my $packet-id = @messages[0].packet-id;
-	is-deeply(@messages[0], Packet::Publish.new(:$packet-id, :$topic, :$payload, :$qos, :!retain, :!dup), 'publish is as expected');
+	is-deeply(@messages[0], Protocol::MQTT::Packet::Publish.new(:$packet-id, :$topic, :$payload, :$qos, :!retain, :!dup), 'publish is as expected');
 
 	$client5.connect;
 	$now++;
 
-	is($client5.state, Unconnected, 'We are connected');
-	is-deeply($client5.next-events($now), [ Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
-	$client5.received-packet(Packet::ConnAck.new(:session-acknowledge), $now);
-	is($client5.state, Connected, 'We are connected');
+	is($client5.state, Protocol::MQTT::Unconnected, 'We are connected');
+	is-deeply($client5.next-events($now), [ Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
+	$client5.received-packet(Protocol::MQTT::Packet::ConnAck.new(:session-acknowledge), $now);
+	is($client5.state, Protocol::MQTT::Connected, 'We are connected');
 	my @messages2 = $client5.next-events($now);
 	is(+@messages2, 1, 'Sending one message again');
-	is-deeply(@messages2[0], Packet::Publish.new(:$packet-id, :$topic, :$payload, :$qos, :!retain, :dup), 'Publish resend is as expected');
+	is-deeply(@messages2[0], Protocol::MQTT::Packet::Publish.new(:$packet-id, :$topic, :$payload, :$qos, :!retain, :dup), 'Publish resend is as expected');
 }
 
 done-testing;

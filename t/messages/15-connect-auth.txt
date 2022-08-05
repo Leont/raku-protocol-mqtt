@@ -1,4 +1,4 @@
-Packet::Connect.new(
+Protocol::MQTT::Packet::Connect.new(
  :client-identifier<mosquitto_sub_3926>,
  :username<guest>
  :password(buf8('passw0rd'.encode))

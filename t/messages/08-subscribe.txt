@@ -1,4 +1,4 @@
-Packet::Subscribe.new(
+Protocol::MQTT::Packet::Subscribe.new(
 	:1packet-id
 	:topic<testing>,
 	:qos(At-most-once),

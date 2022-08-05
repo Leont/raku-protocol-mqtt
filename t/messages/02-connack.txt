@@ -1,3 +1,3 @@
-Packet::ConnAck.new(:return-code(ConnectStatus::Accepted), :0reserved);
+Protocol::MQTT::Packet::ConnAck.new(:return-code(Protocol::MQTT::ConnectStatus::Accepted), :0reserved);
 
 20 02 00 00

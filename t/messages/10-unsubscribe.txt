@@ -1,4 +1,4 @@
-Packet::Unsubscribe.new(
+Protocol::MQTT::Packet::Unsubscribe.new(
 	:1packet-id,
 	:topic<testing>,
 )

@@ -1,4 +1,4 @@
-Packet::SubAck.new(
+Protocol::MQTT::Packet::SubAck.new(
 	:1packet-id,
 	:qos-levels[ At-most-once ],
 )

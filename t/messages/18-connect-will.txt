@@ -1,6 +1,6 @@
-Packet::Connect.new(
+Protocol::MQTT::Packet::Connect.new(
  :client-identifier<mosquitto_sub_10888>,
- :will(Message.new(
+ :will(Protocol::MQTT::Message.new(
 	:topic<topic>,
 	:payload(buf8.new('msg'.encode))
 	:qos(At-least-once),
