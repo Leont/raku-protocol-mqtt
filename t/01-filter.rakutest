@@ -95,7 +95,7 @@ my @match = (
 	'foo/bar/'      => <# foo/# foo/+/# foo/bar/+ foo/bar/# +/+/+>,
 );
 
-my @all-filters = @match.map(*.value).flat.unique.sort;
+my @all-filters = @match.flatmap(*.value).unique.sort;
 
 for @match -> (:key($topic), :value(@should-match)) {
 	say "# Topic $topic";
