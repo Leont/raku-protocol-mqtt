@@ -402,7 +402,7 @@ subtest 'Connect timeout', {
 
 subtest 'Reconnect', {
 	my $client4 = Protocol::MQTT::Client.new(:$client-identifier, :$keep-alive-interval, :$resend-interval);
-	is($client4.state, Protocol::MQTT::Disconnected, 'We are connected');
+	is($client4.state, Protocol::MQTT::Disconnected, 'We are disconnected');
 	$client4.connect;
 	is($client4.state, Protocol::MQTT::Unconnected, 'State starts as unconnected');
 	is-deeply($client4.next-events($now), [ Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'First packet is connect');
@@ -420,7 +420,7 @@ subtest 'Reconnect', {
 	is($promise.status, Planned, 'Promise is planned');
 	$now++;
 
-	is($client4.state, Protocol::MQTT::Unconnected, 'We are connected');
+	is($client4.state, Protocol::MQTT::Unconnected, 'We are unconnected');
 	is-deeply($client4.next-events($now), [ Protocol::MQTT::Packet::Connect.new(:$client-identifier, :$keep-alive-interval) ], 'Next packet is second connect');
 	$client4.received-packet(Protocol::MQTT::Packet::ConnAck.new, $now);
 	is($client4.state, Protocol::MQTT::Connected, 'We are connected');
