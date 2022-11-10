@@ -108,10 +108,8 @@ subset Short of Int where 0 .. 65535;
 subset Topic of Str where /^ <-[\#\+]>* $ /;
 
 our class DecodeBuffer {
-	has buf8:D $!buffer is required;
+	has buf8:D $!buffer is required is built;
 	has Int:D $!offset = 0;
-	submethod BUILD(:$!buffer) {
-	}
 
 	method decode-byte(--> Byte) {
 		die Error::InsufficientData.new('decode-byte') unless $!buffer.elems >= $!offset + 1;
@@ -486,8 +484,7 @@ my %class-for-type = (
 );
 
 our class PacketBuffer {
-	has buf8:D $!buffer is required;
-	submethod BUILD(buf8:D :$!buffer = buf8.new) {}
+	has buf8:D $!buffer is built = buf8.new;
 
 	method add-data(Blob[uint8] $data --> Nil) {
 		$!buffer.append($data);
