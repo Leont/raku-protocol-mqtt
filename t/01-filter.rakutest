@@ -121,6 +121,7 @@ subtest 'mosquitto', {
 	pattern-test("foo/bar/baz", "foo/#");
 	pattern-test("foo/bar/baz", "foo/+/baz");
 	pattern-test("foo/bar/baz", "foo/+/baz/#");
+	pattern-test("foo/bar/baz2", "foo/+/baz/#", :negate);
 	pattern-test("foo/bar/baz/bar", "foo/+/baz/#");
 	pattern-test("foo/foo/baz/bar", "foo/foo/baz/#");
 	pattern-test("foo", "foo/#");
@@ -139,8 +140,9 @@ subtest 'mosquitto', {
 	pattern-test("foo/foo/baz/bar", "foo/foo/baz/#");
 	pattern-test("////foo///bar", "/#");
 
-	sub pattern-test(Str $match, Str $pattern) is hidden-from-backtrace {
-		cmp-ok($match, '~~', far($pattern), "mosquitto: '$match' should match '$pattern'");
+	sub pattern-test(Str $match, Str $pattern, Bool :$negate) is hidden-from-backtrace {
+		my $operator = $negate ?? '!~~' !! '~~';
+		cmp-ok($match, $operator, far($pattern), "mosquitto: '$match' should match '$pattern'");
 	}
 }
 

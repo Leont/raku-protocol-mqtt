@@ -11,13 +11,16 @@ our class Filter {
 		my @matchers;
 		@matchers.push: /<!before '$'>/ if $filter ~~ / ^ \+ /;
 		for $filter.comb(/ '/#' | '/' | <-[/]>+ /) {
-			when '/#' { $anchor = False; last }
+			when '/#' {
+				@matchers.push: / '/' | $ /;
+				$anchor = False;
+				last;
+			}
 			when '+'  { @matchers.push: /<-[/]>*/ }
 			default   { @matchers.push: $_ }
 		}
 		if all(@matchers) ~~ Str {
-			my $string = @matchers.join;
-			return $anchor ?? $string !! *.starts-with($string);
+			return @matchers.join;
 		}
 		elsif $anchor {
 			@matchers.push: / $ /;
