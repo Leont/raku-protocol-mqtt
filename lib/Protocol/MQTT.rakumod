@@ -757,14 +757,14 @@ our class Client {
 				@result.push: Packet::Connect.new(:$!client-identifier, :$!keep-alive-interval, :$clean-session, :$!username, :$!password, :$!will);
 			}
 			when Connecting {
-				if $!next-expiration < $now {
+				if $!next-expiration <= $now {
 					$!state = Unconnected;
 					$!disconnected.emit('Connect timeout');
 					$!next-expiration = $now + $!connect-interval;
 				}
 			}
 			when Connected {
-				if $!keep-alive-interval && $!last-packet-received + 2 * $!keep-alive-interval < $now {
+				if $!keep-alive-interval && $!last-packet-received + 2 * $!keep-alive-interval <= $now {
 					$!state = Disconnected;
 					$!next-expiration = Nil;
 					$!disconnected.emit('Timeout');
@@ -775,7 +775,7 @@ our class Client {
 
 				my @expirations;
 				for %!follow-ups.values.sort(*.order) -> $follow-up {
-					if $follow-up.expiration < $now {
+					if $follow-up.expiration <= $now {
 						@result.push: $follow-up.packet;
 						$follow-up.expiration = $now + $!resend-interval;
 					}
@@ -783,7 +783,7 @@ our class Client {
 				}
 
 				if $!keep-alive-interval {
-					if !@result && $!last-packet-received + $!keep-alive-interval < $now {
+					if !@result && $!last-packet-received + $!keep-alive-interval <= $now {
 						@result.push: Packet::PingReq.new;
 						$!last-ping-sent = $now;
 					}

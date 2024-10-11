@@ -2,6 +2,7 @@ Revision history for Protocol-MQTT
 
 {{$NEXT}}
     - Unify all classes into one module
+    - Make resend logic stricter on resend boundary
 
 0.0.3  2022-02-07T23:40:15+01:00
     - Fix for stricter int/uint distinction in rakudo
