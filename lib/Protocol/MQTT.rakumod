@@ -77,9 +77,9 @@ my role Skip[Int $count = 1] {
 	}
 }
 
-my sub size-of-enum(Enumeration $enum) {
+my sub size-of-enum(Enumeration:U $enum) {
 	state Int %size_of{Enumeration:U};
-	return %size_of{$enum.WHAT} //= $enum.enums.keys.log2.ceiling;
+	return %size_of{$enum} //= $enum.enums.keys.log2.ceiling;
 }
 
 my sub unpack-flags(Int $input, *@selectors) {
@@ -91,9 +91,10 @@ my sub unpack-flags(Int $input, *@selectors) {
 			$index++;
 		}
 		when Enumeration {
-			my $mask = (1 +< size-of-enum($_)) - 1;
+			my $size = size-of-enum($_.WHAT);
+			my $mask = (1 +< $size) - 1;
 			@result.push: $_(($input +> $index) +& $mask) // die Error::InvalidValue.new('Invalid ' ~ $_.^name);
-			$index += 2;
+			$index += $size;
 		}
 		when Skip {
 			$index += .count;
@@ -166,7 +167,7 @@ my sub pack-flags(*@values) {
 		}
 		when $value ~~ Enumeration {
 			$flag +|= $value +< $index;
-			$index += size-of-enum($value);
+			$index += size-of-enum($value.WHAT);
 		}
 		when $value ~~ Skip {
 			$index += $value.count;
