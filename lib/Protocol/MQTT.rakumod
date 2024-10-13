@@ -218,8 +218,8 @@ my class EncodeBuffer {
 		return $buffer;
 	}
 
-	method Buf(--> Buf) {
-		return encode-length($!buffer.elems) ~ $!buffer;
+	method serialize(Int $header --> Buf) {
+		return buf8.new($header) ~ encode-length($!buffer.elems) ~ $!buffer;
 	}
 }
 
@@ -237,7 +237,7 @@ our role Packet[Type $type, Qos $qos = At-most-once] {
 	method encode(Packet:D: --> Buf) {
 		my $buffer = EncodeBuffer.new;
 		self!encode-body($buffer);
-		return buf8.new(self.header-byte) ~ $buffer.Buf;
+		return $buffer.serialize(self.header-byte);
 	}
 }
 
