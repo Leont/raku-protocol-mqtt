@@ -111,11 +111,14 @@ method !send-events(Instant $now --> Nil) {
 	$!cue = $at ?? $*SCHEDULER.cue($callback, :$at) !! Nil;
 }
 
-method publish(Str:D $topic, Str:D $payload, Bool:D :$retain = False, Qos:D :$qos = At-most-once --> Promise:D) {
+multi method publish(Str:D $topic, Blob:D $payload, Bool:D :$retain = False, Qos:D :$qos = At-most-once --> Promise:D) {
 	my $now = now;
-	my $result = $!client.publish($topic, $payload.encode, $qos, $retain, $now);
+	my $result = $!client.publish($topic, $payload, $qos, $retain, $now);
 	self!send-events($now);
 	return $result;
+}
+multi method publish(Str:D $topic, Str:D $payload, Bool:D :$retain = False, Qos:D :$qos = At-most-once --> Promise:D) {
+	return self.publish($topic, $payload.encode, :$retain, :$qos);
 }
 
 method subscribe(Str:D $topic, Qos:D :$qos = At-most-once --> Supply:D) {

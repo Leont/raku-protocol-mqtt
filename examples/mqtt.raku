@@ -45,12 +45,12 @@ react {
 			}
 		}
 		when / ^ pub[lish]? \s+ $<topic>=[\S+] \s+ $<message>=[.*] $ / {
-			whenever $client.publish(~$<topic>, ~$<message>, :$qos) {
+			whenever $client.publish(~$<topic>, $<message>.Str.encode, :$qos) {
 				say 'Sent message';
 			}
 		}
 		when / ^ ret[ain]? \s+ $<topic>=[\S+] \s+ $<message>=[.*] $ / {
-			whenever $client.publish(~$<topic>, ~$<message>, :$qos, :retain) {
+			whenever $client.publish(~$<topic>, $<message>.Str.encode, :$qos, :retain) {
 				say 'Sent retained message';
 			}
 		}
