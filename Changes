@@ -1,6 +1,8 @@
 Revision history for Protocol-MQTT
 
 {{$NEXT}}
+
+0.0.4  2025-06-06T15:22:08+02:00
     - Unify all classes into one module
     - Make resend logic stricter on resend boundary
 
