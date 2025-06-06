@@ -1,6 +1,6 @@
 use v6.d;
 
-unit package Protocol::MQTT:ver<0.0.3>:auth<cpan:LEONT>;
+unit package Protocol::MQTT:ver<0.0.3>:auth<zef:leont>;
 
 our class Error is Exception {
 }

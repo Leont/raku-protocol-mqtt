@@ -1,5 +1,5 @@
 {
-  "auth": "cpan:LEONT",
+  "auth": "zef:leont",
   "authors": [
     "Leon Timmermans"
   ],
@@ -13,8 +13,7 @@
   "perl": "6.d",
   "provides": {
     "Net::MQTT": "lib/Net/MQTT.rakumod",
-    "Protocol::MQTT": "lib/Protocol/MQTT.rakumod",
-    "Protocol::MQTT::Subsets": "lib/Protocol/MQTT/Subsets.rakumod"
+    "Protocol::MQTT": "lib/Protocol/MQTT.rakumod"
   },
   "resources": [
   ],
@@ -23,5 +22,5 @@
   ],
   "test-depends": [
   ],
-  "version": "0.0.1"
+  "version": "0.0.3"
 }
