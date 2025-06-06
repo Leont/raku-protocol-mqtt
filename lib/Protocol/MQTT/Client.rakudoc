@@ -108,7 +108,7 @@ This should be called with every incoming C<Packet>. Turning a data-stream into 
 
 =head2 next-expiration(--> Instant:D)
 
-This returns the next C<Instant> when current outstanding message expire and hence C<next-events> should be called again, if any.
+This returns the next C<Instant> when current outstanding message expire and hence C<next-events> should be called again, if any. This is typically called right after C<next-events> is called.
 
 =head2 incoming(--> Supply:D)
 
